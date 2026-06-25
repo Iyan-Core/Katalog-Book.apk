@@ -16,12 +16,6 @@ export default function HomePage() {
         setLoading(true);
         setError(null);
 
-        // Cek Public Key
-        const publicKey = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
-        if (!publicKey) {
-          throw new Error('VITE_IMAGEKIT_PUBLIC_KEY tidak diisi. Periksa GitHub Secrets.');
-        }
-
         const pages = await fetchImagesFromImageKit();
 
         setBook({
