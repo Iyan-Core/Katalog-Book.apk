@@ -6,33 +6,36 @@ import { Book } from '../types/book';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [book, setBook] = useState<Book | null>(null);
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadBook = async () => {
+    const loadBooks = async () => {
       try {
         setLoading(true);
         setError(null);
-
         const pages = await fetchImagesFromImageKit();
 
-        setBook({
+        if (pages.length === 0) {
+          throw new Error('Tidak ada produk ditemukan.');
+        }
+
+        // 🔥 Buat 1 buku dengan semua halaman sebagai produk
+        setBooks([{
           id: '1',
           title: 'Katalog Parfum',
           coverUrl: pages[0],
           pages: pages,
-        });
+        }]);
       } catch (err) {
         console.error('Error:', err);
         setError((err as Error).message);
-        setBook(null);
       } finally {
         setLoading(false);
       }
     };
-    loadBook();
+    loadBooks();
   }, []);
 
   if (loading) {
@@ -61,32 +64,70 @@ export default function HomePage() {
     );
   }
 
-  if (!book) {
+  if (books.length === 0) {
     return (
       <>
         <Header />
         <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>📭 Tidak ada buku tersedia.</p>
-          <button onClick={() => window.location.reload()}>Muat Ulang</button>
+          <p>📭 Belum ada produk.</p>
         </div>
       </>
     );
   }
 
+  const book = books[0];
+
   return (
     <>
       <Header />
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h2>📚 Pilih Buku</h2>
-        <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center', marginTop: '2rem', flexWrap: 'wrap' }}>
-          <div style={{ border: '1px solid #ccc', borderRadius: '12px', padding: '1rem', width: '200px', background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <img src={book.coverUrl} alt={book.title} style={{ width: '100%', borderRadius: '8px' }} />
-            <h3>{book.title}</h3>
-            <p style={{ fontSize: '0.9rem', color: '#666' }}>{book.pages.length} halaman</p>
-            <button onClick={() => navigate('/reader', { state: { book } })} style={{ marginTop: '0.5rem' }}>
-              Baca Sekarang
-            </button>
-          </div>
+      <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 {book.title}</h2>
+        
+        {/* 🔥 Grid 2 Kolom (Responsif) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '1rem',
+          maxWidth: '800px',
+          margin: '0 auto',
+        }}>
+          {book.pages.map((url, index) => (
+            <div
+              key={index}
+              style={{
+                background: 'white',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                transition: 'transform 0.2s',
+                cursor: 'pointer',
+              }}
+              onClick={() => {
+                // 🔥 Klik untuk melihat detail (opsional)
+                console.log('Produk:', index);
+              }}
+            >
+              <img
+                src={url}
+                alt={`Produk ${index + 1}`}
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  aspectRatio: '3/4',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x400?text=Error';
+                }}
+              />
+              <div style={{ padding: '0.5rem', textAlign: 'center' }}>
+                <p style={{ fontSize: '0.8rem', color: '#666', margin: 0 }}>
+                  Produk {index + 1}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </>
