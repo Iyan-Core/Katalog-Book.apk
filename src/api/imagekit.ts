@@ -1,23 +1,27 @@
+const BASE_URL = import.meta.env.VITE_IMAGEKIT_BASE_URL || 'https://ik.imagekit.io/bn7fafwae';
 const FOLDER_PATH = import.meta.env.VITE_IMAGEKIT_FOLDER_PATH || '/product';
-const IMAGEKIT_PRIVATE_KEY = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || '';
+const PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '';
 
 export async function fetchImagesFromImageKit(): Promise<string[]> {
-  if (!IMAGEKIT_PRIVATE_KEY) {
-    throw new Error('VITE_IMAGEKIT_PRIVATE_KEY tidak diisi. Ambil dari Dashboard ImageKit → Developer Options.');
+  if (!PUBLIC_KEY) {
+    throw new Error('VITE_IMAGEKIT_PUBLIC_KEY tidak diisi. Ambil dari Dashboard ImageKit → Developer Options.');
   }
+
   try {
     const response = await fetch(
       `https://api.imagekit.io/v1/files?path=${FOLDER_PATH}`,
       {
         headers: {
-          Authorization: 'Basic ' + btoa(IMAGEKIT_PRIVATE_KEY + ':'),
+          Authorization: 'Basic ' + btoa(PUBLIC_KEY + ':'),
         },
       }
     );
+
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`HTTP ${response.status}: ${text}`);
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
+
     const data = await response.json();
     const images = data
       .filter((file: any) => file.fileType === 'image')
@@ -25,8 +29,9 @@ export async function fetchImagesFromImageKit(): Promise<string[]> {
       .map((file: any) => file.url);
 
     if (images.length === 0) {
-      throw new Error(`Tidak ada gambar di folder "${FOLDER_PATH}". Periksa isi folder.`);
+      throw new Error(`Tidak ada gambar di folder "${FOLDER_PATH}". Periksa path dan isi folder.`);
     }
+
     return images;
   } catch (error) {
     console.error('Error fetching from ImageKit:', error);
