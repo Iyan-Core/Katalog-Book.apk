@@ -1,18 +1,17 @@
-const BASE_URL = import.meta.env.VITE_IMAGEKIT_BASE_URL || 'https://ik.imagekit.io/bn7fafwae';
 const FOLDER_PATH = import.meta.env.VITE_IMAGEKIT_FOLDER_PATH || '/product';
-const PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '';
+const PRIVATE_KEY = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || '';
 
 export async function fetchImagesFromImageKit(): Promise<string[]> {
-  if (!PUBLIC_KEY) {
-    throw new Error('VITE_IMAGEKIT_PUBLIC_KEY tidak diisi. Ambil dari Dashboard ImageKit → Developer Options.');
+  if (!PRIVATE_KEY) {
+    throw new Error('VITE_IMAGEKIT_PRIVATE_KEY tidak diisi. Ambil dari Dashboard ImageKit → Developer Options.');
   }
 
   try {
     const response = await fetch(
-      `${BASE_URL}/v1/files?path=${FOLDER_PATH}`,
+      `https://api.imagekit.io/v1/files?path=${FOLDER_PATH}`,
       {
         headers: {
-          Authorization: 'Basic ' + btoa(PUBLIC_KEY + ':'),
+          Authorization: 'Basic ' + btoa(PRIVATE_KEY + ':'),
         },
       }
     );
