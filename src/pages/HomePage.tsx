@@ -13,13 +13,19 @@ export default function HomePage() {
       try {
         setLoading(true);
         setError(null);
+
+        // 🔥 Cek Private Key
+        const privateKey = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY;
+        if (!privateKey) {
+          throw new Error('VITE_IMAGEKIT_PRIVATE_KEY tidak diisi. Ambil dari Dashboard ImageKit → Developer Options.');
+        }
+
         const pages = await fetchImagesFromImageKit();
 
         if (pages.length === 0) {
           throw new Error('Tidak ada produk ditemukan.');
         }
 
-        // 🔥 Buat 1 buku dengan semua halaman sebagai produk
         setBooks([{
           id: '1',
           title: 'Katalog Parfum',
@@ -81,7 +87,6 @@ export default function HomePage() {
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
         <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 {book.title}</h2>
         
-        {/* 🔥 Grid 2 Kolom (Responsif) */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -97,12 +102,7 @@ export default function HomePage() {
                 borderRadius: '12px',
                 overflow: 'hidden',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                transition: 'transform 0.2s',
                 cursor: 'pointer',
-              }}
-              onClick={() => {
-                // 🔥 Klik untuk melihat detail (opsional)
-                console.log('Produk:', index);
               }}
             >
               <img
