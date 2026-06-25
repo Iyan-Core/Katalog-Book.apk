@@ -16,13 +16,12 @@ export default function HomePage() {
         setLoading(true);
         setError(null);
 
-        // Cek environment variables
-        const publicKey = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
+        const privateKey = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY;
         const baseUrl = import.meta.env.VITE_IMAGEKIT_BASE_URL;
         const folderPath = import.meta.env.VITE_IMAGEKIT_FOLDER_PATH;
 
-        if (!publicKey) {
-          throw new Error('VITE_IMAGEKIT_PUBLIC_KEY tidak diisi. Periksa GitHub Secrets.');
+        if (!privateKey) {
+          throw new Error('VITE_IMAGEKIT_PRIVATE_KEY tidak diisi. Periksa GitHub Secrets.');
         }
         if (!baseUrl) {
           throw new Error('VITE_IMAGEKIT_BASE_URL tidak diisi. Periksa GitHub Secrets.');
@@ -32,10 +31,6 @@ export default function HomePage() {
         }
 
         const pages = await fetchImagesFromImageKit();
-
-        if (pages.length === 0) {
-          throw new Error(`Tidak ada gambar ditemukan di folder "${folderPath}". Pastikan folder tersebut berisi file gambar.`);
-        }
 
         setBook({
           id: '1',
