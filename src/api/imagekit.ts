@@ -1,29 +1,28 @@
-const IMAGEKIT_BASE_URL = 'https://ik.imagekit.io/your_account';
-const FOLDER_PATH = '/nama-folder-buku'; // Ganti dengan folder kamu
+const FOLDER_PATH = import.meta.env.VITE_IMAGEKIT_FOLDER_PATH || '/product';
+const IMAGEKIT_PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '';
 
-export async function fetchImagesFromImageKit() {
+export async function fetchImagesFromImageKit(): Promise<string[]> {
+  if (!IMAGEKIT_PUBLIC_KEY) {
+    console.warn('IMAGEKIT_PUBLIC_KEY tidak diset');
+    return [];
+  }
   try {
-    // Gunakan Public API Key ImageKit (bisa dilihat di dashboard)
     const response = await fetch(
       `https://api.imagekit.io/v1/files?path=${FOLDER_PATH}`,
       {
         headers: {
-          'Authorization': 'Basic ' + btoa('YOUR_PUBLIC_KEY:'), 
-          // Public key bisa dilihat di dashboard ImageKit -> Developer Options
+          Authorization: 'Basic ' + btoa(IMAGEKIT_PUBLIC_KEY + ':'),
         },
       }
     );
+    if (!response.ok) throw new Error('Gagal fetch dari ImageKit');
     const data = await response.json();
-    
-    // Ambil URL dari setiap file, urutkan berdasarkan nama
-    const urls = data
-      .filter((file: any) => file.fileType === 'image') // Hanya gambar
-      .sort((a: any, b: any) => a.name.localeCompare(b.name)) // Urutkan nama
+    return data
+      .filter((file: any) => file.fileType === 'image')
+      .sort((a: any, b: any) => a.name.localeCompare(b.name))
       .map((file: any) => file.url);
-      
-    return urls;
   } catch (error) {
-    console.error('Gagal ambil daftar gambar:', error);
+    console.error(error);
     return [];
   }
 }
