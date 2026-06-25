@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useTexture, Environment } from '@react-three/drei';
 import { useSpring, animated } from '@react-spring/three';
 import * as THREE from 'three';
@@ -46,7 +46,8 @@ function CurvedPage({
     const positions = geometry.attributes.position;
     for (let i = 0; i < positions.count; i++) {
       const x = positions.getX(i);
-      const y = positions.getY(i);
+      // 🔥 Variabel y tidak dipakai, kita pakai _ sebagai tanda tidak dipakai
+      const _y = positions.getY(i);
       // Lengkungan di bagian tengah (seperti buku terbuka)
       const curve = Math.sin(x * 0.8) * 0.06;
       positions.setZ(i, curve);
