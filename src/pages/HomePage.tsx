@@ -1,37 +1,38 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/layout/Header';
 import { fetchImagesFromImageKit } from '../api/imagekit';
-import { Book } from '../types/book';
+import { fetchProductsFromFirestore } from '../api/firestore';
+import { Product } from '../types/book';
 
 export default function HomePage() {
-  const [books, setBooks] = useState<Book[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
-    const loadBooks = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // 🔥 Cek Private Key
-        const privateKey = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY;
-        if (!privateKey) {
-          throw new Error('VITE_IMAGEKIT_PRIVATE_KEY tidak diisi. Ambil dari Dashboard ImageKit → Developer Options.');
-        }
+        // 🔥 Ambil gambar dari ImageKit
+        const imageUrls = await fetchImagesFromImageKit();
 
-        const pages = await fetchImagesFromImageKit();
+        // 🔥 Ambil data produk dari Firebase
+        const productsData = await fetchProductsFromFirestore();
 
-        if (pages.length === 0) {
-          throw new Error('Tidak ada produk ditemukan.');
-        }
+        // 🔥 Gabungkan: jika produk tidak punya imageUrl, pakai dari ImageKit
+        const mergedProducts = productsData.map((product, index) => ({
+          ...product,
+          imageUrl: product.imageUrl || imageUrls[index] || imageUrls[0],
+        }));
 
-        setBooks([{
-          id: '1',
-          title: 'Katalog Parfum',
-          coverUrl: pages[0],
-          pages: pages,
-        }]);
+        setProducts(mergedProducts);
+        setFilteredProducts(mergedProducts);
       } catch (err) {
         console.error('Error:', err);
         setError((err as Error).message);
@@ -39,8 +40,32 @@ export default function HomePage() {
         setLoading(false);
       }
     };
-    loadBooks();
+    loadData();
   }, []);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim() === '') {
+      setFilteredProducts(products);
+    } else {
+      const filtered = products.filter(product =>
+        product.name.toLowerCase().includes(query.toLowerCase()) ||
+        product.description.toLowerCase().includes(query.toLowerCase()) ||
+        product.gender.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredProducts(filtered);
+    }
+  };
+
+  const handlePreview = (product: Product) => {
+    setSelectedProduct(product);
+    setShowPreview(true);
+  };
+
+  const closePreview = () => {
+    setShowPreview(false);
+    setSelectedProduct(null);
+  };
 
   if (loading) {
     return (
@@ -68,25 +93,37 @@ export default function HomePage() {
     );
   }
 
-  if (books.length === 0) {
-    return (
-      <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>📭 Belum ada produk.</p>
-        </div>
-      </>
-    );
-  }
-
-  const book = books[0];
-
   return (
     <>
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 {book.title}</h2>
+        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 Katalog Parfum</h2>
         
+        <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
+          <input
+            type="text"
+            placeholder="🔍 Cari produk..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              border: '2px solid #e5e7eb',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              outline: 'none',
+              transition: 'border-color 0.2s',
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+            onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+          />
+          {searchQuery && (
+            <p style={{ fontSize: '0.9rem', color: '#6b7280', marginTop: '0.5rem', textAlign: 'center' }}>
+              Menampilkan {filteredProducts.length} dari {products.length} produk
+            </p>
+          )}
+        </div>
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -94,20 +131,29 @@ export default function HomePage() {
           maxWidth: '800px',
           margin: '0 auto',
         }}>
-          {book.pages.map((url, index) => (
+          {filteredProducts.map((product) => (
             <div
-              key={index}
+              key={product.id}
               style={{
                 background: 'white',
                 borderRadius: '12px',
                 overflow: 'hidden',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                transition: 'transform 0.2s, box-shadow 0.2s',
                 cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
               }}
             >
               <img
-                src={url}
-                alt={`Produk ${index + 1}`}
+                src={product.imageUrl}
+                alt={product.name}
                 style={{
                   width: '100%',
                   height: 'auto',
@@ -119,15 +165,170 @@ export default function HomePage() {
                   (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x400?text=Error';
                 }}
               />
-              <div style={{ padding: '0.5rem', textAlign: 'center' }}>
-                <p style={{ fontSize: '0.8rem', color: '#666', margin: 0 }}>
-                  Produk {index + 1}
-                </p>
+              <div style={{ padding: '0.75rem' }}>
+                <h3 style={{ fontSize: '1rem', margin: '0 0 0.25rem 0', fontWeight: '600' }}>
+                  {product.name}
+                </h3>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: '4px',
+                    background: product.gender === 'Pria' ? '#dbeafe' : product.gender === 'Wanita' ? '#fce4ec' : '#e8e5f0',
+                    color: product.gender === 'Pria' ? '#1e40af' : product.gender === 'Wanita' ? '#9c27b0' : '#4a148c',
+                    fontWeight: '500',
+                  }}>
+                    {product.gender}
+                  </span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: '4px',
+                    background: '#f3f4f6',
+                    color: '#374151',
+                  }}>
+                    {product.size}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreview(product);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
+                >
+                  👁️ Preview
+                </button>
               </div>
             </div>
           ))}
         </div>
+
+        {filteredProducts.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+            <p>🔍 Tidak ada produk yang sesuai dengan pencarian.</p>
+          </div>
+        )}
       </div>
+
+      {showPreview && selectedProduct && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+            animation: 'fadeIn 0.3s ease-in',
+          }}
+          onClick={closePreview}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '16px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative',
+              animation: 'slideUp 0.3s ease-out',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closePreview}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                background: 'rgba(0,0,0,0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                fontSize: '1.2rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
+            >
+              ✕
+            </button>
+            <img
+              src={selectedProduct.imageUrl}
+              alt={selectedProduct.name}
+              style={{
+                width: '100%',
+                height: 'auto',
+                aspectRatio: '3/4',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+            <div style={{ padding: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.name}</h2>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                <span style={{
+                  fontSize: '0.85rem',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '4px',
+                  background: selectedProduct.gender === 'Pria' ? '#dbeafe' : selectedProduct.gender === 'Wanita' ? '#fce4ec' : '#e8e5f0',
+                  color: selectedProduct.gender === 'Pria' ? '#1e40af' : selectedProduct.gender === 'Wanita' ? '#9c27b0' : '#4a148c',
+                  fontWeight: '500',
+                }}>
+                  {selectedProduct.gender}
+                </span>
+                <span style={{
+                  fontSize: '0.85rem',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '4px',
+                  background: '#f3f4f6',
+                  color: '#374151',
+                }}>
+                  {selectedProduct.size}
+                </span>
+              </div>
+              <p style={{ fontSize: '1rem', color: '#374151', lineHeight: '1.6', margin: 0 }}>
+                {selectedProduct.description}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(30px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
     </>
   );
 }
