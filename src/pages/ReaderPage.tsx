@@ -1,8 +1,8 @@
-import React from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Header from '../components/layout/header';
-import BookViewer from '../components/book/bookViewer';
-import BookControls from '../components/book/bookControls';
+import Header from '../components/layout/Header';
+import BookViewer from '../components/book/BookViewer';
+import BookControls from '../components/book/BookControls';
 import { useBook } from '../hooks/useBook';
 
 export default function ReaderPage() {
@@ -11,7 +11,12 @@ export default function ReaderPage() {
   const book = location.state?.book;
 
   if (!book) {
-    return <div>Buku tidak ditemukan. <button onClick={() => navigate('/')}>Kembali</button></div>;
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <p>Buku tidak ditemukan.</p>
+        <button onClick={() => navigate('/')}>Kembali ke Katalog</button>
+      </div>
+    );
   }
 
   const { state, nextPage, prevPage } = useBook(book.pages.length);
@@ -21,9 +26,9 @@ export default function ReaderPage() {
       <Header />
       <div style={{ padding: '1rem' }}>
         <button onClick={() => navigate('/')} style={{ marginBottom: '1rem', background: '#6b7280' }}>
-          ← Kembali ke Katalog
+          ← Kembali
         </button>
-        <h2>{book.title}</h2>
+        <h2 style={{ textAlign: 'center' }}>{book.title}</h2>
         <BookViewer pages={book.pages} currentPage={state.currentPage} />
         <BookControls
           currentPage={state.currentPage}
