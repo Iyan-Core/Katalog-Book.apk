@@ -1,3 +1,4 @@
+const BASE_URL = import.meta.env.VITE_IMAGEKIT_BASE_URL || 'https://ik.imagekit.io/bn7fafwae';
 const FOLDER_PATH = import.meta.env.VITE_IMAGEKIT_FOLDER_PATH || '/product';
 const PRIVATE_KEY = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || '';
 
@@ -8,7 +9,7 @@ export async function fetchImagesFromImageKit(): Promise<string[]> {
 
   try {
     const response = await fetch(
-      `https://api.imagekit.io/v1/files?path=${FOLDER_PATH}`,
+      `${BASE_URL}/v1/files?path=${FOLDER_PATH}`,
       {
         headers: {
           Authorization: 'Basic ' + btoa(PRIVATE_KEY + ':'),
