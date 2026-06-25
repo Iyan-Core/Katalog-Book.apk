@@ -16,25 +16,17 @@ export default function HomePage() {
         setLoading(true);
         setError(null);
 
-        const privateKey = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY;
-        const baseUrl = import.meta.env.VITE_IMAGEKIT_BASE_URL;
-        const folderPath = import.meta.env.VITE_IMAGEKIT_FOLDER_PATH;
-
-        if (!privateKey) {
-          throw new Error('VITE_IMAGEKIT_PRIVATE_KEY tidak diisi. Periksa GitHub Secrets.');
-        }
-        if (!baseUrl) {
-          throw new Error('VITE_IMAGEKIT_BASE_URL tidak diisi. Periksa GitHub Secrets.');
-        }
-        if (!folderPath) {
-          throw new Error('VITE_IMAGEKIT_FOLDER_PATH tidak diisi. Periksa GitHub Secrets.');
+        // Cek Public Key
+        const publicKey = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
+        if (!publicKey) {
+          throw new Error('VITE_IMAGEKIT_PUBLIC_KEY tidak diisi. Periksa GitHub Secrets.');
         }
 
         const pages = await fetchImagesFromImageKit();
 
         setBook({
           id: '1',
-          title: 'Katalog Otomatis',
+          title: 'Katalog Parfum',
           coverUrl: pages[0],
           pages: pages,
         });
