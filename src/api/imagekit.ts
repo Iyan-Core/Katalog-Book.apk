@@ -9,7 +9,7 @@ export async function fetchImagesFromImageKit(): Promise<string[]> {
 
   try {
     const response = await fetch(
-      `https://api.imagekit.io/v1/files?path=${FOLDER_PATH}`,
+      `${BASE_URL}/v1/files?path=${FOLDER_PATH}`,
       {
         headers: {
           Authorization: 'Basic ' + btoa(PUBLIC_KEY + ':'),
