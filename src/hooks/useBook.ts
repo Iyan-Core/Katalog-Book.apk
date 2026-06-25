@@ -1,35 +1,24 @@
-import { useEffect, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Book } from '../types/book';
+import { useState } from 'react';
+import { BookState } from '../types/book';
 
-export function useBooks() {
-  const [books, setBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
+export function useBook(totalPages: number) {
+  const [state, setState] = useState<BookState>({
+    currentPage: 0,
+    totalPages,
+    isFlipping: false,
+  });
 
-  useEffect(() => {
-    const fetchBooks = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'books'));
-        const data = querySnapshot.docs.map(doc => {
-          const docData = doc.data();
-          return {
-            id: doc.id,
-            title: docData.title || 'Tanpa Judul',
-            coverUrl: docData.coverUrl || '',
-            // PASTIKAN pages adalah array, jika tidak, beri array kosong
-            pages: Array.isArray(docData.pages) ? docData.pages : [],
-          } as Book;
-        });
-        setBooks(data);
-      } catch (error) {
-        console.error('Error fetching books:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBooks();
-  }, []);
+  const goToPage = (page: number) => {
+    if (page < 0 || page >= totalPages || state.isFlipping) return;
+    setState((prev) => ({ ...prev, currentPage: page }));
+  };
 
-  return { books, loading };
+  const nextPage = () => goToPage(state.currentPage + 1);
+  const prevPage = () => goToPage(state.currentPage - 1);
+
+  const setFlipping = (flipping: boolean) => {
+    setState((prev) => ({ ...prev, isFlipping: flipping }));
+  };
+
+  return { state, goToPage, nextPage, prevPage, setFlipping };
 }
