@@ -14,22 +14,38 @@ export default function HomePage() {
     const loadBook = async () => {
       try {
         setLoading(true);
-        const pages = await fetchImagesFromImageKit();
-        if (pages.length === 0) {
-          setError('Tidak ada gambar ditemukan di folder ImageKit.');
-          setBook(null);
-        } else {
-          setBook({
-            id: '1',
-            title: 'Katalog Otomatis',
-            coverUrl: pages[0],
-            pages: pages,
-          });
-          setError(null);
+        setError(null);
+
+        // Cek environment variables
+        const publicKey = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
+        const baseUrl = import.meta.env.VITE_IMAGEKIT_BASE_URL;
+        const folderPath = import.meta.env.VITE_IMAGEKIT_FOLDER_PATH;
+
+        if (!publicKey) {
+          throw new Error('VITE_IMAGEKIT_PUBLIC_KEY tidak diisi. Periksa GitHub Secrets.');
         }
+        if (!baseUrl) {
+          throw new Error('VITE_IMAGEKIT_BASE_URL tidak diisi. Periksa GitHub Secrets.');
+        }
+        if (!folderPath) {
+          throw new Error('VITE_IMAGEKIT_FOLDER_PATH tidak diisi. Periksa GitHub Secrets.');
+        }
+
+        const pages = await fetchImagesFromImageKit();
+
+        if (pages.length === 0) {
+          throw new Error(`Tidak ada gambar ditemukan di folder "${folderPath}". Pastikan folder tersebut berisi file gambar.`);
+        }
+
+        setBook({
+          id: '1',
+          title: 'Katalog Otomatis',
+          coverUrl: pages[0],
+          pages: pages,
+        });
       } catch (err) {
-        console.error(err);
-        setError('Terjadi kesalahan saat memuat data dari ImageKit.');
+        console.error('Error:', err);
+        setError((err as Error).message);
         setBook(null);
       } finally {
         setLoading(false);
@@ -52,8 +68,13 @@ export default function HomePage() {
       <>
         <Header />
         <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p style={{ color: 'red' }}>❌ {error}</p>
-          <button onClick={() => window.location.reload()}>Coba Lagi</button>
+          <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
+            <h3>❌ Gagal Memuat Data</h3>
+            <p style={{ marginTop: '0.5rem', wordBreak: 'break-word' }}>{error}</p>
+            <button onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>
+              Coba Lagi
+            </button>
+          </div>
         </div>
       </>
     );
@@ -63,7 +84,10 @@ export default function HomePage() {
     return (
       <>
         <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>📭 Belum ada buku tersedia.</div>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <p>📭 Tidak ada buku tersedia.</p>
+          <button onClick={() => window.location.reload()}>Muat Ulang</button>
+        </div>
       </>
     );
   }
