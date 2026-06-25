@@ -4,7 +4,7 @@ import ReaderPage from './pages/ReaderPage';
 
 function App() {
   return (
-    <BrowserRouter basename="/my-flipbook-app/"> {/* sesuaikan dengan base di vite.config */}
+    <BrowserRouter basename="/Katalog-Book-apk/"> {/* sesuaikan dengan base di vite.config */}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/reader" element={<ReaderPage />} />
