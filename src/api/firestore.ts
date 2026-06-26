@@ -7,20 +7,14 @@ export async function fetchProductsFromFirestore(): Promise<Product[]> {
     console.log('🔥 Mencoba koneksi ke Firestore...');
     
     if (!db) {
-      throw new Error('Firestore db tidak terinisialisasi.');
+      throw new Error('❌ Firestore db tidak terinisialisasi. Periksa environment variables.');
     }
 
-    // 🔥 Coba baca dari collection "products"
+    // 🔥 Coba baca collection products
     console.log('📂 Mencoba membaca collection: products');
-    let querySnapshot = await getDocs(collection(db, 'products'));
+    const querySnapshot = await getDocs(collection(db, 'products'));
     
-    // 🔥 Jika kosong, coba dari "product" (tanpa s)
-    if (querySnapshot.empty) {
-      console.warn('⚠️ Collection "products" kosong, mencoba "product"...');
-      querySnapshot = await getDocs(collection(db, 'product'));
-    }
-
-    console.log(`📄 Jumlah dokumen ditemukan: ${querySnapshot.size}`);
+    console.log(`📄 Jumlah dokumen: ${querySnapshot.size}`);
 
     if (querySnapshot.empty) {
       return [];
@@ -29,23 +23,21 @@ export async function fetchProductsFromFirestore(): Promise<Product[]> {
     const products: Product[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      console.log(`📦 Dokumen ${doc.id}:`, data);
-      
-      const product: Product = {
+      products.push({
         id: doc.id,
         name: data.name || data.nama || 'Produk',
-        coverUrl: data.coverUrl || data.imageUrl || data.gambar || '',
+        coverUrl: data.coverUrl || data.imageUrl || '',
         gender: data.gender || data.category || 'Unisex',
         size: data.size ? String(data.size) : '-',
         desc: data.desc || data.description || 'Deskripsi belum tersedia',
-      };
-      products.push(product);
+      });
     });
 
     console.log(`✅ Total produk: ${products.length}`);
     return products;
   } catch (error) {
     console.error('❌ Error detail:', error);
+    // Lempar error agar ditampilkan di UI
     throw new Error(`Gagal mengambil data: ${(error as Error).message}`);
   }
 }
