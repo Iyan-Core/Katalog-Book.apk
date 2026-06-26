@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
-import emailjs from '@emailjs/browser';
 import Header from '../components/layout/Header';
 import { fetchProductsFromFirestore } from '../api/firestore';
+import { sendVisitNotification } from '../api/email';
 import { Product } from '../types/book';
-
-// 🔥 Inisialisasi EmailJS
-emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '');
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -15,40 +12,66 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [notificationSent, setNotificationSent] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [visitorEmail, setVisitorEmail] = useState<string>(() => {
+    return localStorage.getItem('visitorEmail') || '';
+  });
+  // 🔥 Popup muncul jika belum ada email di localStorage
+  const [showEmailInput, setShowEmailInput] = useState(!localStorage.getItem('visitorEmail'));
 
-  // 🔥 Kirim notifikasi saat user membuka halaman
-  useEffect(() => {
-    const sendNotification = async () => {
-      if (notificationSent) return;
-      
-      try {
-        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-        const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-        
-        if (!serviceId || !templateId) {
-          console.warn('EmailJS not configured');
-          return;
-        }
-
-        const templateParams = {
-          to_email: 'walanton2@gmail.com', // Ganti dengan email Anda
-          user_agent: navigator.userAgent,
-          screen_size: `${window.screen.width}x${window.screen.height}`,
-          referrer: document.referrer || 'Direct',
-          timestamp: new Date().toLocaleString('id-ID'),
-          url: window.location.href,
-        };
-
-        await emailjs.send(serviceId, templateId, templateParams);
-        console.log('✅ Email notifikasi terkirim!');
-        setNotificationSent(true);
-      } catch (error) {
-        console.error('❌ Gagal kirim email:', error);
+  // 🔥 Ambil lokasi pengunjung
+  const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
       }
-    };
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, enableHighAccuracy: true }
+      );
+    });
+  };
 
-    sendNotification();
-  }, [notificationSent]);
+  // 🔥 Kirim notifikasi (dipanggil saat email tersedia)
+  const sendNotification = async () => {
+    if (notificationSent) return;
+    if (!visitorEmail) {
+      setNotificationError('Email pengunjung belum diisi.');
+      return;
+    }
+
+    try {
+      setNotificationError(null);
+      const location = await getLocation();
+      
+      const visitor = {
+        userAgent: navigator.userAgent,
+        screenSize: `${window.screen.width}x${window.screen.height}`,
+        referrer: document.referrer || 'Direct',
+        timestamp: new Date().toLocaleString('id-ID'),
+        url: window.location.href,
+        latitude: location?.lat,
+        longitude: location?.lng,
+        visitorEmail: visitorEmail,
+      };
+
+      await sendVisitNotification('walanton2@gmail.com', visitor);
+      setNotificationSent(true);
+      console.log('✅ Notifikasi berhasil dikirim!');
+    } catch (err: any) {
+      console.error('❌ Error kirim notifikasi:', err);
+      setNotificationError(err.message || 'Gagal kirim notifikasi.');
+    }
+  };
+
+  // 🔥 Kirim notifikasi otomatis saat email tersedia
+  useEffect(() => {
+    if (visitorEmail && !notificationSent) {
+      sendNotification();
+    }
+  }, [visitorEmail, notificationSent]);
 
   // 🔥 Ambil data produk dari Firestore
   useEffect(() => {
@@ -76,6 +99,24 @@ export default function HomePage() {
     p.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.gender.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // 🔥 Simpan email dan tutup popup
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (visitorEmail.trim()) {
+      localStorage.setItem('visitorEmail', visitorEmail.trim());
+      setShowEmailInput(false);
+    }
+  };
+
+  // 🔥 Reset email (tombol di pojok kanan bawah)
+  const resetEmail = () => {
+    localStorage.removeItem('visitorEmail');
+    setVisitorEmail('');
+    setShowEmailInput(true);
+    setNotificationSent(false);
+    setNotificationError(null);
+  };
 
   if (loading) {
     return (
@@ -116,7 +157,100 @@ export default function HomePage() {
     <>
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
+        {/* 🔥 Modal input email */}
+        {showEmailInput && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '16px',
+              padding: '2rem',
+              maxWidth: '400px',
+              width: '100%',
+              textAlign: 'center',
+            }}>
+              <h3 style={{ marginBottom: '0.5rem' }}>📧 Masukkan Email Anda</h3>
+              <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
+                Kami akan mengirim notifikasi ke admin. Email Anda tidak akan disalahgunakan.
+              </p>
+              <form onSubmit={handleEmailSubmit}>
+                <input
+                  type="email"
+                  placeholder="contoh@email.com"
+                  value={visitorEmail}
+                  onChange={(e) => setVisitorEmail(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    marginBottom: '1rem',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Kirim & Lanjutkan
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
         <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 Katalog Parfum</h2>
+        
+        {/* 🔥 Tombol Kirim Notifikasi Manual (untuk testing) */}
+        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+          <button
+            onClick={sendNotification}
+            style={{
+              padding: '0.5rem 1.5rem',
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+            }}
+          >
+            📧 Kirim Notifikasi Tes
+          </button>
+          {notificationError && (
+            <p style={{ color: 'red', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+              ❌ {notificationError}
+            </p>
+          )}
+          {notificationSent && (
+            <p style={{ color: '#10b981', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+              ✅ Notifikasi sudah terkirim!
+            </p>
+          )}
+        </div>
+
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
           <input
             type="text"
@@ -144,6 +278,30 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* 🔥 Tombol Reset Email (pojok kanan bawah) */}
+      <button
+        onClick={resetEmail}
+        style={{
+          position: 'fixed',
+          bottom: '1rem',
+          right: '1rem',
+          background: '#6b7280',
+          color: 'white',
+          border: 'none',
+          borderRadius: '50%',
+          width: '48px',
+          height: '48px',
+          fontSize: '1.2rem',
+          cursor: 'pointer',
+          zIndex: 999,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        }}
+        title="Reset Email"
+      >
+        ✉️
+      </button>
+
       {showPreview && selectedProduct && (
         <div style={{ position: 'fixed', top:0, left:0, right:0, bottom:0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={() => setShowPreview(false)}>
           <div style={{ background: 'white', borderRadius: '16px', maxWidth: '500px', width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
