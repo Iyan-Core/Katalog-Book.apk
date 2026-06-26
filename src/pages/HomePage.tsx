@@ -5,7 +5,7 @@ import { Book, ProductDetail } from '../types/book';
 
 export default function HomePage() {
   const [books, setBooks] = useState<Book[]>([]);
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,7 +19,9 @@ export default function HomePage() {
         setError(null);
         const data = await fetchBooksFromFirestore();
         setBooks(data);
-        if (data.length > 0) setSelectedBook(data[0]);
+        if (data.length > 0) {
+          setSelectedBookId(data[0].id);
+        }
       } catch (err) {
         console.error('Error:', err);
         setError((err as Error).message);
@@ -29,6 +31,8 @@ export default function HomePage() {
     };
     loadData();
   }, []);
+
+  const selectedBook = books.find(b => b.id === selectedBookId) || books[0];
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -84,7 +88,12 @@ export default function HomePage() {
   // Gabungkan pages dengan details
   const products = selectedBook.pages.map((image, index) => ({
     image,
-    detail: selectedBook.details[index] || { name: `Produk ${index+1}`, gender: 'Unisex', size: '-', description: 'Deskripsi belum tersedia' }
+    detail: selectedBook.details[index] || { 
+      name: `Produk ${index+1}`, 
+      gender: 'Unisex', 
+      size: '-', 
+      description: 'Deskripsi belum tersedia' 
+    }
   }));
 
   const filteredProducts = products.filter(p =>
@@ -98,6 +107,29 @@ export default function HomePage() {
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
         <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 {selectedBook.title}</h2>
+
+        {/* Pilihan buku jika lebih dari 1 */}
+        {books.length > 1 && (
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            {books.map(book => (
+              <button
+                key={book.id}
+                onClick={() => setSelectedBookId(book.id)}
+                style={{
+                  padding: '0.4rem 1rem',
+                  background: selectedBookId === book.id ? '#3b82f6' : '#e5e7eb',
+                  color: selectedBookId === book.id ? 'white' : '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                }}
+              >
+                {book.title}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
           <input
