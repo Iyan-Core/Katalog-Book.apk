@@ -13,3 +13,9 @@ export interface Book {
   coverUrl: string;
   products: Product[];
 }
+
+export interface BookState {
+  currentPage: number;
+  totalPages: number;
+  isFlipping: boolean;
+}
