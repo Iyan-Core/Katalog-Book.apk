@@ -121,7 +121,7 @@ export default function HomePage() {
   };
 
   // 🔥 Ganti dengan link aplikasi shop Anda
-  const SHOP_LINK = 'https://shop.example.com'; // <-- GANTI DENGAN LINK SHOP ANDA
+  const SHOP_LINK = 'https://aparfume.wordpress.com/purchase-order/'; // <-- GANTI DENGAN LINK SHOP ANDA
 
   if (loading) {
     return (
