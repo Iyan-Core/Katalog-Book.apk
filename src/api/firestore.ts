@@ -3,20 +3,18 @@ import { db } from '../firebase';
 import { Product } from '../types/book';
 
 export async function fetchProductsFromFirestore(): Promise<Product[]> {
-  try {
-    console.log('🔥 Mencoba koneksi ke Firestore...');
-    
-    if (!db) {
-      throw new Error('❌ Firestore db tidak terinisialisasi. Periksa environment variables.');
-    }
+  console.log('🔥 Memulai fetch dari Firestore...');
+  
+  if (!db) {
+    throw new Error('❌ Firestore tidak terinisialisasi. Periksa environment variables.');
+  }
 
-    // 🔥 Coba baca collection products
-    console.log('📂 Mencoba membaca collection: products');
+  try {
     const querySnapshot = await getDocs(collection(db, 'products'));
-    
     console.log(`📄 Jumlah dokumen: ${querySnapshot.size}`);
 
     if (querySnapshot.empty) {
+      console.warn('⚠️ Collection "products" kosong.');
       return [];
     }
 
@@ -25,9 +23,9 @@ export async function fetchProductsFromFirestore(): Promise<Product[]> {
       const data = doc.data();
       products.push({
         id: doc.id,
-        name: data.name || data.nama || 'Produk',
-        coverUrl: data.coverUrl || data.imageUrl || '',
-        gender: data.gender || data.category || 'Unisex',
+        name: data.name || 'Produk',
+        coverUrl: data.coverUrl || '',
+        gender: data.gender || 'Unisex',
         size: data.size ? String(data.size) : '-',
         desc: data.desc || data.description || 'Deskripsi belum tersedia',
       });
@@ -35,9 +33,15 @@ export async function fetchProductsFromFirestore(): Promise<Product[]> {
 
     console.log(`✅ Total produk: ${products.length}`);
     return products;
-  } catch (error) {
-    console.error('❌ Error detail:', error);
-    // Lempar error agar ditampilkan di UI
-    throw new Error(`Gagal mengambil data: ${(error as Error).message}`);
+  } catch (error: any) {
+    console.error('❌ Error Firestore:', error);
+    // Tangkap error spesifik
+    if (error.code === 'permission-denied') {
+      throw new Error('⛔ Firestore: Izin ditolak. Periksa Rules.');
+    } else if (error.code === 'unavailable') {
+      throw new Error('⛔ Firestore: Tidak tersedia. Periksa koneksi.');
+    } else {
+      throw new Error(`⛔ ${error.message}`);
+    }
   }
 }
