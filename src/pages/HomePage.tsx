@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
+import emailjs from '@emailjs/browser';
 import Header from '../components/layout/Header';
 import { fetchProductsFromFirestore } from '../api/firestore';
 import { Product } from '../types/book';
+
+// 🔥 Inisialisasi EmailJS
+emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '');
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -10,7 +14,43 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [notificationSent, setNotificationSent] = useState(false);
 
+  // 🔥 Kirim notifikasi saat user membuka halaman
+  useEffect(() => {
+    const sendNotification = async () => {
+      if (notificationSent) return;
+      
+      try {
+        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+        const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+        
+        if (!serviceId || !templateId) {
+          console.warn('EmailJS not configured');
+          return;
+        }
+
+        const templateParams = {
+          to_email: 'walanton2@gmail.com', // Ganti dengan email Anda
+          user_agent: navigator.userAgent,
+          screen_size: `${window.screen.width}x${window.screen.height}`,
+          referrer: document.referrer || 'Direct',
+          timestamp: new Date().toLocaleString('id-ID'),
+          url: window.location.href,
+        };
+
+        await emailjs.send(serviceId, templateId, templateParams);
+        console.log('✅ Email notifikasi terkirim!');
+        setNotificationSent(true);
+      } catch (error) {
+        console.error('❌ Gagal kirim email:', error);
+      }
+    };
+
+    sendNotification();
+  }, [notificationSent]);
+
+  // 🔥 Ambil data produk dari Firestore
   useEffect(() => {
     const load = async () => {
       try {
@@ -37,7 +77,14 @@ export default function HomePage() {
     p.gender.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) return (<><Header /><div style={{padding:'2rem',textAlign:'center'}}>⏳ Memuat...</div></>);
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>⏳ Memuat produk...</div>
+      </>
+    );
+  }
 
   if (error) {
     return (
