@@ -18,7 +18,7 @@ export default function HomePage() {
   });
   const [showEmailInput, setShowEmailInput] = useState(!localStorage.getItem('visitorEmail'));
 
-  // 🔥 Toast otomatis hilang setelah 3 detik
+  // Toast hilang otomatis setelah 3 detik
   useEffect(() => {
     if (toastMessage) {
       const timer = setTimeout(() => setToastMessage(null), 3000);
@@ -26,7 +26,7 @@ export default function HomePage() {
     }
   }, [toastMessage]);
 
-  // 🔥 Ambil lokasi
+  // 🔥 Ambil lokasi pengunjung (tetap dipertahankan)
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -41,7 +41,7 @@ export default function HomePage() {
     });
   };
 
-  // 🔥 Kirim notifikasi
+  // Kirim notifikasi (dengan lokasi)
   const sendNotification = async () => {
     if (notificationSent) return;
     if (!visitorEmail) {
@@ -57,28 +57,28 @@ export default function HomePage() {
         referrer: document.referrer || 'Direct',
         timestamp: new Date().toLocaleString('id-ID'),
         url: window.location.href,
+        visitorEmail: visitorEmail,
         latitude: location?.lat,
         longitude: location?.lng,
-        visitorEmail: visitorEmail,
       };
 
       await sendVisitNotification('walanton2@gmail.com', visitor);
       setNotificationSent(true);
       setToastMessage('✅ Notifikasi terkirim!');
     } catch (err: any) {
-      console.error(err);
-      setToastMessage('❌ Gagal kirim notifikasi.');
+      console.error('❌ Gagal kirim notifikasi:', err);
+      setToastMessage('❌ Gagal kirim notifikasi. Cek console.');
     }
   };
 
-  // 🔥 Kirim otomatis saat email tersedia
+  // Kirim otomatis saat email tersedia
   useEffect(() => {
     if (visitorEmail && !notificationSent) {
       sendNotification();
     }
   }, [visitorEmail, notificationSent]);
 
-  // 🔥 Ambil data produk
+  // Ambil data produk
   useEffect(() => {
     const load = async () => {
       try {
@@ -113,15 +113,8 @@ export default function HomePage() {
     }
   };
 
-  const resetEmail = () => {
-    localStorage.removeItem('visitorEmail');
-    setVisitorEmail('');
-    setShowEmailInput(true);
-    setNotificationSent(false);
-  };
-
-  // 🔥 Ganti dengan link aplikasi shop Anda
-  const SHOP_LINK = 'https://aparfume.wordpress.com/purchase-order/'; // <-- GANTI DENGAN LINK SHOP ANDA
+  // 🔥 Link aplikasi shop Anda (ganti dengan link shop Anda)
+  const SHOP_LINK = 'https://aparfume.wordpress.com/purchase-order/'; // GANTI DENGAN LINK SHOP ANDA
 
   if (loading) {
     return (
@@ -162,7 +155,7 @@ export default function HomePage() {
     <>
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* 🔥 Popup email */}
+        {/* Popup email */}
         {showEmailInput && (
           <div style={{
             position: 'fixed',
@@ -226,7 +219,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 🔥 Toast notifikasi */}
+        {/* Toast notifikasi */}
         {toastMessage && (
           <div style={{
             position: 'fixed',
@@ -246,7 +239,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 🔥 Search bar */}
+        {/* Search bar */}
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
           <input
             type="text"
@@ -257,7 +250,7 @@ export default function HomePage() {
           />
         </div>
 
-        {/* 🔥 Grid produk */}
+        {/* Grid produk */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', maxWidth: '800px', margin: '0 auto' }}>
           {filtered.map((p) => (
             <div key={p.id} style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -277,7 +270,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 🔥 Tombol Chat (ganti ✉️) */}
+      {/* 🔥 Tombol Chat (pojok kanan bawah) */}
       <button
         onClick={() => window.open(SHOP_LINK, '_blank')}
         style={{
@@ -303,28 +296,7 @@ export default function HomePage() {
         💬
       </button>
 
-      {/* 🔥 Tombol Reset Email (kecil, di pojok kiri bawah) */}
-      <button
-        onClick={resetEmail}
-        style={{
-          position: 'fixed',
-          bottom: '1rem',
-          left: '1rem',
-          background: '#6b7280',
-          color: 'white',
-          border: 'none',
-          borderRadius: '50%',
-          width: '40px',
-          height: '40px',
-          fontSize: '1rem',
-          cursor: 'pointer',
-          zIndex: 999,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-        }}
-        title="Reset Email"
-      >
-        ✉️
-      </button>
+      {/* 🔥 Ikon reset email (✉️) di kiri bawah — SUDAH DIHAPUS */}
 
       {showPreview && selectedProduct && (
         <div style={{ position: 'fixed', top:0, left:0, right:0, bottom:0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={() => setShowPreview(false)}>
