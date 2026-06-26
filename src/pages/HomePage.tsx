@@ -12,14 +12,21 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [notificationSent, setNotificationSent] = useState(false);
-  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [visitorEmail, setVisitorEmail] = useState<string>(() => {
     return localStorage.getItem('visitorEmail') || '';
   });
-  // 🔥 Popup muncul jika belum ada email di localStorage
   const [showEmailInput, setShowEmailInput] = useState(!localStorage.getItem('visitorEmail'));
 
-  // 🔥 Ambil lokasi pengunjung
+  // 🔥 Toast otomatis hilang setelah 3 detik
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  // 🔥 Ambil lokasi
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -34,18 +41,16 @@ export default function HomePage() {
     });
   };
 
-  // 🔥 Kirim notifikasi (dipanggil saat email tersedia)
+  // 🔥 Kirim notifikasi
   const sendNotification = async () => {
     if (notificationSent) return;
     if (!visitorEmail) {
-      setNotificationError('Email pengunjung belum diisi.');
+      setToastMessage('❌ Email belum diisi.');
       return;
     }
 
     try {
-      setNotificationError(null);
       const location = await getLocation();
-      
       const visitor = {
         userAgent: navigator.userAgent,
         screenSize: `${window.screen.width}x${window.screen.height}`,
@@ -59,21 +64,21 @@ export default function HomePage() {
 
       await sendVisitNotification('walanton2@gmail.com', visitor);
       setNotificationSent(true);
-      console.log('✅ Notifikasi berhasil dikirim!');
+      setToastMessage('✅ Notifikasi terkirim!');
     } catch (err: any) {
-      console.error('❌ Error kirim notifikasi:', err);
-      setNotificationError(err.message || 'Gagal kirim notifikasi.');
+      console.error(err);
+      setToastMessage('❌ Gagal kirim notifikasi.');
     }
   };
 
-  // 🔥 Kirim notifikasi otomatis saat email tersedia
+  // 🔥 Kirim otomatis saat email tersedia
   useEffect(() => {
     if (visitorEmail && !notificationSent) {
       sendNotification();
     }
   }, [visitorEmail, notificationSent]);
 
-  // 🔥 Ambil data produk dari Firestore
+  // 🔥 Ambil data produk
   useEffect(() => {
     const load = async () => {
       try {
@@ -100,7 +105,6 @@ export default function HomePage() {
     p.gender.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // 🔥 Simpan email dan tutup popup
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (visitorEmail.trim()) {
@@ -109,14 +113,15 @@ export default function HomePage() {
     }
   };
 
-  // 🔥 Reset email (tombol di pojok kanan bawah)
   const resetEmail = () => {
     localStorage.removeItem('visitorEmail');
     setVisitorEmail('');
     setShowEmailInput(true);
     setNotificationSent(false);
-    setNotificationError(null);
   };
+
+  // 🔥 Ganti dengan link aplikasi shop Anda
+  const SHOP_LINK = 'https://shop.example.com'; // <-- GANTI DENGAN LINK SHOP ANDA
 
   if (loading) {
     return (
@@ -157,7 +162,7 @@ export default function HomePage() {
     <>
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* 🔥 Modal input email */}
+        {/* 🔥 Popup email */}
         {showEmailInput && (
           <div style={{
             position: 'fixed',
@@ -221,36 +226,27 @@ export default function HomePage() {
           </div>
         )}
 
-        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 Katalog Parfum</h2>
-        
-        {/* 🔥 Tombol Kirim Notifikasi Manual (untuk testing) */}
-        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-          <button
-            onClick={sendNotification}
-            style={{
-              padding: '0.5rem 1.5rem',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-            }}
-          >
-            📧 Kirim Notifikasi Tes
-          </button>
-          {notificationError && (
-            <p style={{ color: 'red', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              ❌ {notificationError}
-            </p>
-          )}
-          {notificationSent && (
-            <p style={{ color: '#10b981', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              ✅ Notifikasi sudah terkirim!
-            </p>
-          )}
-        </div>
+        {/* 🔥 Toast notifikasi */}
+        {toastMessage && (
+          <div style={{
+            position: 'fixed',
+            top: '1rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: toastMessage.includes('✅') ? '#10b981' : '#ef4444',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '8px',
+            zIndex: 9999,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            animation: 'fadeInDown 0.3s ease-out',
+            fontSize: '0.95rem',
+          }}>
+            {toastMessage}
+          </div>
+        )}
 
+        {/* 🔥 Search bar */}
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
           <input
             type="text"
@@ -260,6 +256,8 @@ export default function HomePage() {
             style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '1rem', outline: 'none' }}
           />
         </div>
+
+        {/* 🔥 Grid produk */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', maxWidth: '800px', margin: '0 auto' }}>
           {filtered.map((p) => (
             <div key={p.id} style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -279,20 +277,46 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 🔥 Tombol Reset Email (pojok kanan bawah) */}
+      {/* 🔥 Tombol Chat (ganti ✉️) */}
+      <button
+        onClick={() => window.open(SHOP_LINK, '_blank')}
+        style={{
+          position: 'fixed',
+          bottom: '1rem',
+          right: '1rem',
+          background: '#25d366',
+          color: 'white',
+          border: 'none',
+          borderRadius: '50%',
+          width: '56px',
+          height: '56px',
+          fontSize: '1.8rem',
+          cursor: 'pointer',
+          zIndex: 999,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        title="Chat dengan kami"
+      >
+        💬
+      </button>
+
+      {/* 🔥 Tombol Reset Email (kecil, di pojok kiri bawah) */}
       <button
         onClick={resetEmail}
         style={{
           position: 'fixed',
           bottom: '1rem',
-          right: '1rem',
+          left: '1rem',
           background: '#6b7280',
           color: 'white',
           border: 'none',
           borderRadius: '50%',
-          width: '48px',
-          height: '48px',
-          fontSize: '1.2rem',
+          width: '40px',
+          height: '40px',
+          fontSize: '1rem',
           cursor: 'pointer',
           zIndex: 999,
           boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
@@ -318,6 +342,13 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
     </>
   );
 }
