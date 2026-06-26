@@ -15,6 +15,7 @@ export default function HomePage() {
   const [visitorEmail, setVisitorEmail] = useState(() => localStorage.getItem('visitorEmail') || '');
   const [showEmailPopup, setShowEmailPopup] = useState(!localStorage.getItem('visitorEmail'));
   const [locationDenied, setLocationDenied] = useState(false);
+  const [isWaitingLocation, setIsWaitingLocation] = useState(false);
 
   // Toast hilang 3 detik
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function HomePage() {
     }
   }, [toast]);
 
-  // 🔥 Ambil lokasi (popup browser akan muncul)
+  // Ambil lokasi
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -39,7 +40,7 @@ export default function HomePage() {
     });
   };
 
-  // 🔥 Kirim notifikasi
+  // Kirim notifikasi
   const sendNotification = async (loc: { lat: number; lng: number } | null) => {
     if (!visitorEmail) return;
     try {
@@ -59,7 +60,7 @@ export default function HomePage() {
     }
   };
 
-  // 🔥 Handle submit email → langsung minta lokasi
+  // Handle submit email
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!visitorEmail.trim()) {
@@ -67,81 +68,28 @@ export default function HomePage() {
       return;
     }
 
-    // Simpan email ke localStorage
     localStorage.setItem('visitorEmail', visitorEmail.trim());
     setShowEmailPopup(false);
-
-    // 🔥 Minta lokasi (popup browser akan muncul)
+    setIsWaitingLocation(true);
     setToast('📍 Meminta izin lokasi...');
+
     const loc = await getLocation();
+    setIsWaitingLocation(false);
 
     if (!loc) {
-      // Lokasi ditolak
       setLocationDenied(true);
       setToast(null);
       return;
     }
 
-    // Lokasi diizinkan → kirim notifikasi & load produk
     await sendNotification(loc);
     setToast('✅ Notifikasi terkirim!');
     setLoading(false);
   };
 
-  // 🔥 Jika lokasi ditolak, tampilkan halaman "Akses Ditolak"
-  if (locationDenied) {
-    return (
-      <>
-        <Header />
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '1rem',
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '2rem',
-            maxWidth: '400px',
-            width: '100%',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🚫</div>
-            <h3>Akses Ditolak</h3>
-            <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
-              Anda harus mengizinkan lokasi untuk mengakses katalog.
-            </p>
-            <button
-              onClick={() => window.location.href = 'https://www.google.com'}
-              style={{
-                padding: '0.75rem 2rem',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                cursor: 'pointer',
-              }}
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // 🔥 Ambil data produk (hanya jika lokasi sudah diizinkan)
+  // Load produk (hanya jika lokasi diizinkan)
   useEffect(() => {
-    if (showEmailPopup || locationDenied) return;
+    if (showEmailPopup || locationDenied || isWaitingLocation) return;
     const load = async () => {
       try {
         setLoading(true);
@@ -158,7 +106,7 @@ export default function HomePage() {
       }
     };
     load();
-  }, [showEmailPopup, locationDenied]);
+  }, [showEmailPopup, locationDenied, isWaitingLocation]);
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -166,121 +114,177 @@ export default function HomePage() {
     p.gender.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const SHOP_LINK = 'https://aparfume.wordpress.com/purchase-order/'; // Ganti dengan link shop Anda
+  const SHOP_LINK = 'https://shop.example.com'; // Ganti dengan link shop Anda
 
   // ========== RENDER ==========
 
-  // Popup email
-  if (showEmailPopup) {
-    return (
-      <>
-        <Header />
+  let content;
+
+  if (locationDenied) {
+    content = (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.8)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+      }}>
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '1rem',
+          background: 'white',
+          borderRadius: '16px',
+          padding: '2rem',
+          maxWidth: '400px',
+          width: '100%',
+          textAlign: 'center',
         }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '2rem',
-            maxWidth: '400px',
-            width: '100%',
-            textAlign: 'center',
-          }}>
-            <h3>📧 Masukkan Email Anda</h3>
-            <p style={{ fontSize: '0.9rem', color: '#6b7280' }}>
-              Wajib diisi untuk mengakses katalog.
-            </p>
-            <form onSubmit={handleEmailSubmit}>
-              <input
-                type="email"
-                placeholder="contoh@email.com"
-                value={visitorEmail}
-                onChange={(e) => setVisitorEmail(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  marginBottom: '1rem',
-                  outline: 'none',
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  background: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Kirim & Lanjutkan
-              </button>
-            </form>
+          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🚫</div>
+          <h3>Akses Ditolak</h3>
+          <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+            Anda harus mengizinkan lokasi untuk mengakses katalog.
+          </p>
+          <button
+            onClick={() => window.location.href = 'https://www.google.com'}
+            style={{
+              padding: '0.75rem 2rem',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+            }}
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    );
+  } else if (showEmailPopup) {
+    content = (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '16px',
+          padding: '2rem',
+          maxWidth: '400px',
+          width: '100%',
+          textAlign: 'center',
+        }}>
+          <h3>📧 Masukkan Email Anda</h3>
+          <p style={{ fontSize: '0.9rem', color: '#6b7280' }}>
+            Wajib diisi untuk mengakses katalog.
+          </p>
+          <form onSubmit={handleEmailSubmit}>
+            <input
+              type="email"
+              placeholder="contoh@email.com"
+              value={visitorEmail}
+              onChange={(e) => setVisitorEmail(e.target.value)}
+              required
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '2px solid #e5e7eb',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                marginBottom: '1rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+              }}
+            >
+              Kirim & Lanjutkan
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  } else if (isWaitingLocation) {
+    content = (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0,0,0,0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '16px',
+          padding: '2rem',
+          maxWidth: '400px',
+          width: '100%',
+          textAlign: 'center',
+        }}>
+          <h3>📍 Meminta Izin Lokasi</h3>
+          <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
+            Mohon izinkan akses lokasi di browser.
+          </p>
+          <div style={{ width: '100%', height: '4px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '100%', background: '#3b82f6', animation: 'pulse 1.5s infinite' }} />
           </div>
+          <style>{`
+            @keyframes pulse {
+              0% { opacity: 0.3; }
+              50% { opacity: 1; }
+              100% { opacity: 0.3; }
+            }
+          `}</style>
         </div>
-      </>
+      </div>
     );
-  }
-
-  // Loading
-  if (loading) {
-    return (
-      <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>⏳ Memuat produk...</div>
-      </>
-    );
-  }
-
-  // Error
-  if (error) {
-    return (
-      <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
-            <h3>❌ Error</h3>
-            <p>{error}</p>
-            <button onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>Coba Lagi</button>
-          </div>
+  } else if (loading) {
+    content = <div style={{ padding: '2rem', textAlign: 'center' }}>⏳ Memuat produk...</div>;
+  } else if (error) {
+    content = (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
+          <h3>❌ Error</h3>
+          <p>{error}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>Coba Lagi</button>
         </div>
-      </>
+      </div>
     );
-  }
-
-  if (products.length === 0) {
-    return (
+  } else if (products.length === 0) {
+    content = <div style={{ padding: '2rem', textAlign: 'center' }}>📭 Belum ada produk.</div>;
+  } else {
+    content = (
       <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>📭 Belum ada produk.</p>
-        </div>
-      </>
-    );
-  }
-
-  // Catalog
-  return (
-    <>
-      <Header />
-      <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
         {toast && (
           <div style={{
             position: 'fixed',
@@ -378,138 +382,117 @@ export default function HomePage() {
             <p>🔍 Tidak ada produk yang sesuai.</p>
           </div>
         )}
-      </div>
 
-      {/* Tombol chat */}
-      <button
-        onClick={() => window.open(SHOP_LINK, '_blank')}
-        style={{
-          position: 'fixed',
-          bottom: '1rem',
-          right: '1rem',
-          background: '#25d366',
-          color: 'white',
-          border: 'none',
-          borderRadius: '50%',
-          width: '56px',
-          height: '56px',
-          fontSize: '1.8rem',
-          cursor: 'pointer',
-          zIndex: 999,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        title="Chat dengan kami"
-      >
-        💬
-      </button>
-
-      {/* Tombol reset email (kecil) */}
-      <button
-        onClick={() => {
-          localStorage.removeItem('visitorEmail');
-          setVisitorEmail('');
-          setShowEmailPopup(true);
-          setLocationDenied(false);
-          setToast('✉️ Email direset. Silakan isi ulang.');
-        }}
-        style={{
-          position: 'fixed',
-          bottom: '1rem',
-          left: '1rem',
-          background: 'rgba(107, 114, 128, 0.7)',
-          color: 'white',
-          border: 'none',
-          borderRadius: '50%',
-          width: '36px',
-          height: '36px',
-          fontSize: '0.9rem',
-          cursor: 'pointer',
-          zIndex: 999,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-          backdropFilter: 'blur(4px)',
-        }}
-        title="Reset email"
-      >
-        ✉️
-      </button>
-
-      {showPreview && selectedProduct && (
-        <div
+        {/* Tombol chat ke shop */}
+        <button
+          onClick={() => window.open(SHOP_LINK, '_blank')}
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.7)',
+            bottom: '1rem',
+            right: '1rem',
+            background: '#25d366',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            fontSize: '1.8rem',
+            cursor: 'pointer',
+            zIndex: 999,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem',
           }}
-          onClick={() => setShowPreview(false)}
+          title="Chat dengan kami"
         >
+          💬
+        </button>
+
+        {/* Ikon email DIHAPUS (tidak ada lagi) */}
+
+        {showPreview && selectedProduct && (
           <div
             style={{
-              background: 'white',
-              borderRadius: '16px',
-              maxWidth: '500px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              position: 'relative',
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '1rem',
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => setShowPreview(false)}
           >
-            <button
-              onClick={() => setShowPreview(false)}
+            <div
               style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                background: 'rgba(0,0,0,0.1)',
-                border: 'none',
-                borderRadius: '50%',
-                width: 36,
-                height: 36,
-                fontSize: '1.2rem',
-                cursor: 'pointer',
-              }}
-            >
-              ✕
-            </button>
-            <img
-              src={selectedProduct.coverUrl}
-              alt={selectedProduct.name}
-              style={{
+                background: 'white',
+                borderRadius: '16px',
+                maxWidth: '500px',
                 width: '100%',
-                aspectRatio: '3/4',
-                objectFit: 'cover',
-                display: 'block',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                position: 'relative',
               }}
-            />
-            <div style={{ padding: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.name}</h2>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#e5e7eb' }}>{selectedProduct.gender}</span>
-                <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#f3f4f6' }}>{selectedProduct.size}</span>
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowPreview(false)}
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  right: 10,
+                  background: 'rgba(0,0,0,0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 36,
+                  height: 36,
+                  fontSize: '1.2rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+              <img
+                src={selectedProduct.coverUrl}
+                alt={selectedProduct.name}
+                style={{
+                  width: '100%',
+                  aspectRatio: '3/4',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+              <div style={{ padding: '1.5rem' }}>
+                <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.name}</h2>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#e5e7eb' }}>{selectedProduct.gender}</span>
+                  <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#f3f4f6' }}>{selectedProduct.size}</span>
+                </div>
+                <p style={{ fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{selectedProduct.desc}</p>
               </div>
-              <p style={{ fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{selectedProduct.desc}</p>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <style>{`
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-          to { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-      `}</style>
+        <style>{`
+          @keyframes fadeInDown {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+          }
+        `}</style>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Header />
+      {content}
     </>
   );
 }
