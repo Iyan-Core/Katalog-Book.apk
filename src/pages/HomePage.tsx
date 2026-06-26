@@ -12,8 +12,10 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [visitorEmail, setVisitorEmail] = useState(() => localStorage.getItem('visitorEmail') || '');
-  const [showEmailPopup, setShowEmailPopup] = useState(!localStorage.getItem('visitorEmail'));
+  
+  // Menggunakan sessionStorage agar popup selalu muncul setiap kali user membuka URL baru (tab baru / refresh session)
+  const [visitorEmail, setVisitorEmail] = useState(() => sessionStorage.getItem('visitorEmail') || '');
+  const [showEmailPopup, setShowEmailPopup] = useState(!sessionStorage.getItem('visitorEmail'));
   const [locationDenied, setLocationDenied] = useState(false);
 
   useEffect(() => {
@@ -37,11 +39,10 @@ export default function HomePage() {
     });
   };
 
-  const sendNotification = async (loc: { lat: number; lng: number } | null) => {
-    if (!visitorEmail) return;
+  const sendNotification = async (email: string, loc: { lat: number; lng: number } | null) => {
     try {
       await sendVisitNotification('walanton2@gmail.com', {
-        visitorEmail,
+        visitorEmail: email,
         userAgent: navigator.userAgent,
         screenSize: `${window.screen.width}x${window.screen.height}`,
         referrer: document.referrer || 'Direct',
@@ -63,27 +64,27 @@ export default function HomePage() {
       return;
     }
 
-    // 🔥 Langsung minta lokasi (popup browser akan muncul)
     setToast('📍 Meminta izin lokasi...');
     const loc = await getLocation();
 
     if (!loc) {
       setLocationDenied(true);
-      setToast(null);
+      setToast('❌ Akses lokasi ditolak. Anda tidak dapat melanjutkan.');
       return;
     }
 
-    // Lokasi diizinkan → simpan email, tutup popup, kirim notifikasi
-    localStorage.setItem('visitorEmail', visitorEmail.trim());
+    // Jika sukses mendapatkan lokasi, simpan ke sessionStorage dan update state
+    sessionStorage.setItem('visitorEmail', visitorEmail.trim());
     setShowEmailPopup(false);
-    await sendNotification(loc);
-    setToast('✅ Notifikasi terkirim!');
-    setLoading(false);
+    
+    // Kirim notifikasi EmailJS dengan data koordinat akurat
+    await sendNotification(visitorEmail.trim(), loc);
   };
 
-  // Load produk setelah lokasi diizinkan
+  // Load produk dari Firestore HANYA setelah email diisi DAN lokasi diizinkan
   useEffect(() => {
     if (showEmailPopup || locationDenied) return;
+
     const load = async () => {
       try {
         setLoading(true);
@@ -108,52 +109,39 @@ export default function HomePage() {
     p.gender.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const SHOP_LINK = 'https://shop.example.com'; // Ganti dengan link shop Anda
+  const SHOP_LINK = 'https://shop.example.com'; 
 
-  // ========== RENDER ==========
+  // ========== RENDER LOGIC ==========
   let content;
 
   if (locationDenied) {
     content = (
       <div style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: '1rem',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.95)', // Gelap total menutup halaman belakang
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999, padding: '1rem',
       }}>
         <div style={{
-          background: 'white',
-          borderRadius: '16px',
-          padding: '2rem',
-          maxWidth: '400px',
-          width: '100%',
-          textAlign: 'center',
+          background: 'white', borderRadius: '16px', padding: '2rem',
+          maxWidth: '400px', width: '100%', textAlign: 'center',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
         }}>
           <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🚫</div>
-          <h3>Akses Ditolak</h3>
+          <h3 style={{ color: '#1f2937', margin: '0 0 0.5rem' }}>Akses Ditolak</h3>
           <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
-            Anda harus mengizinkan lokasi untuk mengakses katalog.
+            Anda wajib memberikan izin lokasi untuk dapat mengakses dan melihat katalog produk kami.
           </p>
           <button
-            onClick={() => window.location.href = 'https://www.google.com'}
+            onClick={() => window.location.reload()}
             style={{
-              padding: '0.75rem 2rem',
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '1rem',
-              cursor: 'pointer',
+              padding: '0.75rem 2rem', background: '#ef4444', color: 'white',
+              border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer',
+              width: '100%', fontWeight: 'bold'
             }}
           >
-            Tutup
+            Coba Lagi & Izinkan
           </button>
         </div>
       </div>
@@ -162,28 +150,19 @@ export default function HomePage() {
     content = (
       <div style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: '1rem',
+        top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.85)', // Menutup halaman katalog sepenuhnya
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999, padding: '1rem',
       }}>
         <div style={{
-          background: 'white',
-          borderRadius: '16px',
-          padding: '2rem',
-          maxWidth: '400px',
-          width: '100%',
-          textAlign: 'center',
+          background: 'white', borderRadius: '16px', padding: '2rem',
+          maxWidth: '400px', width: '100%', textAlign: 'center',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
         }}>
-          <h3>📧 Masukkan Email Anda</h3>
-          <p style={{ fontSize: '0.9rem', color: '#6b7280' }}>
-            Wajib diisi untuk mengakses katalog.
+          <h3 style={{ color: '#1f2937', margin: '0 0 0.5rem' }}>📧 Verifikasi Akses</h3>
+          <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+            Silakan masukkan email Anda untuk melanjutkan ke halaman katalog.
           </p>
           <form onSubmit={handleEmailSubmit}>
             <input
@@ -193,120 +172,76 @@ export default function HomePage() {
               onChange={(e) => setVisitorEmail(e.target.value)}
               required
               style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                marginBottom: '1rem',
-                outline: 'none',
+                width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb',
+                borderRadius: '8px', fontSize: '1rem', marginBottom: '1.25rem',
+                outline: 'none', boxSizing: 'border-box'
               }}
             />
             <button
               type="submit"
               style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                cursor: 'pointer',
+                width: '100%', padding: '0.75rem', background: '#3b82f6',
+                color: 'white', border: 'none', borderRadius: '8px',
+                fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold'
               }}
             >
-              Kirim & Lanjutkan
+              Kirim & Minta Izin Lokasi
             </button>
           </form>
         </div>
       </div>
     );
   } else if (loading) {
-    content = <div style={{ padding: '2rem', textAlign: 'center' }}>⏳ Memuat produk...</div>;
+    content = <div style={{ padding: '3rem', textAlign: 'center', color: '#4b5563' }}>⏳ Memuat katalog produk...</div>;
   } else if (error) {
     content = (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
-          <h3>❌ Error</h3>
+          <h3>❌ Gagal Memuat Data</h3>
           <p>{error}</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>Coba Lagi</button>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}>Coba Lagi</button>
         </div>
       </div>
     );
-  } else if (products.length === 0) {
-    content = <div style={{ padding: '2rem', textAlign: 'center' }}>📭 Belum ada produk.</div>;
   } else {
     content = (
       <>
-        {toast && (
-          <div style={{
-            position: 'fixed',
-            top: '1rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: toast.includes('✅') ? '#10b981' : '#ef4444',
-            color: 'white',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            zIndex: 9999,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-            animation: 'fadeInDown 0.3s ease-out',
-            maxWidth: '90%',
-            textAlign: 'center',
-          }}>
-            {toast}
-          </div>
-        )}
-
-        <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
+        {/* Konten Utama Katalog */}
+        <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '1.5rem auto' }}>
           <input
             type="text"
             placeholder="🔍 Cari produk..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              width: '100%',
-              padding: '0.75rem 1rem',
-              border: '2px solid #e5e7eb',
-              borderRadius: '8px',
-              fontSize: '1rem',
-              outline: 'none',
+              width: '100%', padding: '0.75rem 1rem', border: '2px solid #e5e7eb',
+              borderRadius: '8px', fontSize: '1rem', outline: 'none', boxSizing: 'border-box'
             }}
           />
         </div>
 
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '1rem',
-          maxWidth: '800px',
-          margin: '0 auto',
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '1rem', maxWidth: '800px', margin: '0 auto', padding: '0 1rem 5rem'
         }}>
           {filtered.map((p) => (
             <div
               key={p.id}
               style={{
-                background: 'white',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                background: 'white', borderRadius: '12px',
+                overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
               }}
             >
               <img
                 src={p.coverUrl}
                 alt={p.name}
-                style={{
-                  width: '100%',
-                  aspectRatio: '3/4',
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
+                style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
               />
               <div style={{ padding: '0.75rem' }}>
-                <h3 style={{ fontSize: '1rem', margin: '0 0 0.25rem 0' }}>{p.name}</h3>
+                <h3 style={{ fontSize: '1rem', margin: '0 0 0.25rem 0', color: '#1f2937' }}>{p.name}</h3>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#e5e7eb' }}>{p.gender}</span>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#f3f4f6' }}>{p.size}</span>
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#e5e7eb', color: '#374151' }}>{p.gender}</span>
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#f3f4f6', color: '#374151' }}>{p.size}</span>
                 </div>
                 <button
                   onClick={() => {
@@ -314,13 +249,8 @@ export default function HomePage() {
                     setShowPreview(true);
                   }}
                   style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
+                    width: '100%', padding: '0.5rem', background: '#3b82f6',
+                    color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer'
                   }}
                 >
                   👁️ Preview
@@ -336,74 +266,45 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Tombol chat ke shop */}
+        {/* Tombol Chat Utama Pojok Kanan Bawah */}
         <button
           onClick={() => window.open(SHOP_LINK, '_blank')}
           style={{
-            position: 'fixed',
-            bottom: '1rem',
-            right: '1rem',
-            background: '#25d366',
-            color: 'white',
-            border: 'none',
-            borderRadius: '50%',
-            width: '56px',
-            height: '56px',
-            fontSize: '1.8rem',
-            cursor: 'pointer',
-            zIndex: 999,
+            position: 'fixed', bottom: '1.5rem', right: '1.5rem',
+            background: '#25d366', color: 'white', border: 'none',
+            borderRadius: '50%', width: '56px', height: '56px',
+            fontSize: '1.8rem', cursor: 'pointer', zIndex: 999,
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
           title="Chat dengan kami"
         >
           💬
         </button>
 
+        {/* Modal Preview Produk */}
         {showPreview && selectedProduct && (
           <div
             style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-              padding: '1rem',
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.7)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem',
             }}
             onClick={() => setShowPreview(false)}
           >
             <div
               style={{
-                background: 'white',
-                borderRadius: '16px',
-                maxWidth: '500px',
-                width: '100%',
-                maxHeight: '90vh',
-                overflow: 'auto',
-                position: 'relative',
+                background: 'white', borderRadius: '16px', maxWidth: '500px',
+                width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative',
               }}
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 onClick={() => setShowPreview(false)}
                 style={{
-                  position: 'absolute',
-                  top: 10,
-                  right: 10,
-                  background: 'rgba(0,0,0,0.1)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: 36,
-                  height: 36,
-                  fontSize: '1.2rem',
-                  cursor: 'pointer',
+                  position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.1)',
+                  border: 'none', borderRadius: '50%', width: 36, height: 36,
+                  fontSize: '1.2rem', cursor: 'pointer',
                 }}
               >
                 ✕
@@ -411,12 +312,7 @@ export default function HomePage() {
               <img
                 src={selectedProduct.coverUrl}
                 alt={selectedProduct.name}
-                style={{
-                  width: '100%',
-                  aspectRatio: '3/4',
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
+                style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
               />
               <div style={{ padding: '1.5rem' }}>
                 <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.name}</h2>
@@ -424,18 +320,11 @@ export default function HomePage() {
                   <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#e5e7eb' }}>{selectedProduct.gender}</span>
                   <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#f3f4f6' }}>{selectedProduct.size}</span>
                 </div>
-                <p style={{ fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{selectedProduct.desc}</p>
+                <p style={{ fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: '#4b5563' }}>{selectedProduct.desc}</p>
               </div>
             </div>
           </div>
         )}
-
-        <style>{`
-          @keyframes fadeInDown {
-            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-            to { opacity: 1; transform: translateX(-50%) translateY(0); }
-          }
-        `}</style>
       </>
     );
   }
@@ -443,7 +332,25 @@ export default function HomePage() {
   return (
     <>
       <Header />
+      {/* Toast Alert Global */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)',
+          background: toast.includes('✅') ? '#10b981' : '#ef4444', color: 'white',
+          padding: '0.75rem 1.5rem', borderRadius: '8px', zIndex: 10000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: '90%', textAlign: 'center',
+          animation: 'fadeInDown 0.3s ease-out', fontWeight: '500'
+        }}>
+          {toast}
+        </div>
+      )}
       {content}
+      <style>{`
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
     </>
   );
 }
