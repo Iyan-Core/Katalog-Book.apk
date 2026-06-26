@@ -15,7 +15,6 @@ export default function HomePage() {
   const [visitorEmail, setVisitorEmail] = useState(() => localStorage.getItem('visitorEmail') || '');
   const [showEmailPopup, setShowEmailPopup] = useState(!localStorage.getItem('visitorEmail'));
 
-  // Toast hilang 3 detik
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 3000);
@@ -23,7 +22,6 @@ export default function HomePage() {
     }
   }, [toast]);
 
-  // Ambil lokasi (akan muncul popup izin setelah email diisi)
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -38,7 +36,6 @@ export default function HomePage() {
     });
   };
 
-  // Kirim notifikasi dengan lokasi
   const sendNotification = async () => {
     if (!visitorEmail) {
       setToast('❌ Email belum diisi.');
@@ -63,14 +60,12 @@ export default function HomePage() {
     }
   };
 
-  // Kirim otomatis setelah email tersimpan
   useEffect(() => {
     if (visitorEmail) {
       sendNotification();
     }
   }, [visitorEmail]);
 
-  // Ambil data produk dari Firestore
   useEffect(() => {
     const load = async () => {
       try {
@@ -104,8 +99,7 @@ export default function HomePage() {
     }
   };
 
-  // Ganti dengan link shop Anda
-  const SHOP_LINK = 'https://shop.example.com';
+  const SHOP_LINK = 'https://aparfume.wordpress.com/purchase-order/'; // Ganti dengan link shop Anda
 
   if (loading) {
     return (
@@ -146,7 +140,6 @@ export default function HomePage() {
     <>
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Popup email */}
         {showEmailPopup && (
           <div style={{
             position: 'fixed',
@@ -169,10 +162,8 @@ export default function HomePage() {
               width: '100%',
               textAlign: 'center',
             }}>
-              <h3 style={{ marginBottom: '0.5rem' }}>📧 Masukkan Email Anda</h3>
-              <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-                Kami akan mengirim notifikasi ke admin. Email Anda tidak akan disalahgunakan.
-              </p>
+              <h3>📧 Masukkan Email Anda</h3>
+              <p style={{ fontSize: '0.9rem', color: '#6b7280' }}>Kami akan kirim notifikasi ke admin.</p>
               <form onSubmit={handleEmailSubmit}>
                 <input
                   type="email"
@@ -210,7 +201,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Toast notifikasi */}
         {toast && (
           <div style={{
             position: 'fixed',
@@ -224,13 +214,11 @@ export default function HomePage() {
             zIndex: 9999,
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
             animation: 'fadeInDown 0.3s ease-out',
-            fontSize: '0.95rem',
           }}>
             {toast}
           </div>
         )}
 
-        {/* Search bar */}
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
           <input
             type="text"
@@ -248,7 +236,6 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Grid produk 2 kolom */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -279,22 +266,8 @@ export default function HomePage() {
               <div style={{ padding: '0.75rem' }}>
                 <h3 style={{ fontSize: '1rem', margin: '0 0 0.25rem 0' }}>{p.name}</h3>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: '0.75rem',
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '4px',
-                    background: '#e5e7eb',
-                  }}>
-                    {p.gender}
-                  </span>
-                  <span style={{
-                    fontSize: '0.75rem',
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '4px',
-                    background: '#f3f4f6',
-                  }}>
-                    {p.size}
-                  </span>
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#e5e7eb' }}>{p.gender}</span>
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#f3f4f6' }}>{p.size}</span>
                 </div>
                 <button
                   onClick={() => {
@@ -325,7 +298,6 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Tombol chat ke shop (pojok kanan bawah) */}
       <button
         onClick={() => window.open(SHOP_LINK, '_blank')}
         style={{
@@ -351,7 +323,6 @@ export default function HomePage() {
         💬
       </button>
 
-      {/* Modal Preview */}
       {showPreview && selectedProduct && (
         <div
           style={{
@@ -411,26 +382,10 @@ export default function HomePage() {
             <div style={{ padding: '1.5rem' }}>
               <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.name}</h2>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                <span style={{
-                  fontSize: '0.85rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '4px',
-                  background: '#e5e7eb',
-                }}>
-                  {selectedProduct.gender}
-                </span>
-                <span style={{
-                  fontSize: '0.85rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '4px',
-                  background: '#f3f4f6',
-                }}>
-                  {selectedProduct.size}
-                </span>
+                <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#e5e7eb' }}>{selectedProduct.gender}</span>
+                <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#f3f4f6' }}>{selectedProduct.size}</span>
               </div>
-              <p style={{ fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                {selectedProduct.desc}
-              </p>
+              <p style={{ fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{selectedProduct.desc}</p>
             </div>
           </div>
         </div>
