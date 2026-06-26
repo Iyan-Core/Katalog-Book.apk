@@ -126,7 +126,7 @@ export default function HomePage() {
     p.gender.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const SHOP_LINK = 'https://shop.example.com'; // Ganti dengan link shop Anda
+  const SHOP_LINK = 'https://aparfume.wordpress.com/purchase-order/'; // Ganti dengan link shop Anda
 
   // ========== RENDER ==========
 
