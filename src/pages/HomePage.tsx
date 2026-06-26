@@ -26,7 +26,7 @@ export default function HomePage() {
         const productsData = await fetchProductsFromFirestore();
 
         // 🔥 Gabungkan: jika produk tidak punya imageUrl, pakai dari ImageKit
-        const mergedProducts = productsData.map((product, index) => ({
+        const mergedProducts: Product[] = productsData.map((product: Product, index: number) => ({
           ...product,
           imageUrl: product.imageUrl || imageUrls[index] || imageUrls[0],
         }));
@@ -48,7 +48,7 @@ export default function HomePage() {
     if (query.trim() === '') {
       setFilteredProducts(products);
     } else {
-      const filtered = products.filter(product =>
+      const filtered = products.filter((product: Product) =>
         product.name.toLowerCase().includes(query.toLowerCase()) ||
         product.description.toLowerCase().includes(query.toLowerCase()) ||
         product.gender.toLowerCase().includes(query.toLowerCase())
@@ -131,7 +131,7 @@ export default function HomePage() {
           maxWidth: '800px',
           margin: '0 auto',
         }}>
-          {filteredProducts.map((product) => (
+          {filteredProducts.map((product: Product) => (
             <div
               key={product.id}
               style={{
