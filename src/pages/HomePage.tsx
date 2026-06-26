@@ -16,8 +16,6 @@ export default function HomePage() {
   const [toast, setToast] = useState<string | null>(null);
   const [visitorEmail, setVisitorEmail] = useState('');
   const [step, setStep] = useState<Step>('email');
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Toast hilang 3 detik
   useEffect(() => {
@@ -31,20 +29,12 @@ export default function HomePage() {
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
-        setLocationError('Browser tidak support geolocation');
         resolve(null);
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setLocationError(null);
-          resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        },
-        (err) => {
-          setLocationError('Izin lokasi ditolak.');
-          resolve(null);
-        },
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
         { timeout: 10000, enableHighAccuracy: true }
       );
     });
@@ -64,8 +54,7 @@ export default function HomePage() {
         longitude: loc?.lng,
       });
       setToast('✅ Notifikasi terkirim!');
-    } catch (err) {
-      console.error(err);
+    } catch {
       setToast('❌ Gagal kirim notifikasi.');
     }
   };
@@ -78,22 +67,17 @@ export default function HomePage() {
       return;
     }
 
-    // Pindah ke tahap lokasi
     setStep('location');
     setToast('📍 Meminta izin lokasi...');
 
-    // Minta lokasi
     const loc = await getLocation();
 
     if (!loc) {
-      // Lokasi ditolak → denied
       setStep('denied');
       setToast(null);
       return;
     }
 
-    // Lokasi diizinkan → kirim notifikasi & tampilkan katalog
-    setLocation(loc);
     await sendNotification(loc);
     setStep('catalog');
     setToast('✅ Notifikasi terkirim!');
@@ -199,7 +183,7 @@ export default function HomePage() {
     );
   }
 
-  // 2. Popup location / denied
+  // 2. Popup location
   if (step === 'location') {
     return (
       <>
