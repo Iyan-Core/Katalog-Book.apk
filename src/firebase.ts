@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
-// Baca dari environment variables
+// Baca dari environment
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -11,26 +11,23 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// 🔥 Cek apakah ada yang kosong
-const missingVars = Object.entries(firebaseConfig)
-  .filter(([, value]) => !value)
-  .map(([key]) => key);
+// Cek apakah ada yang kosong
+const missing = Object.entries(firebaseConfig)
+  .filter(([_, v]) => !v)
+  .map(([k]) => k);
 
-if (missingVars.length > 0) {
-  const errorMsg = `Firebase config missing: ${missingVars.join(', ')}`;
-  console.error('❌', errorMsg);
-  // ❗ Jangan throw error di sini, nanti ditangani di komponen
+if (missing.length > 0) {
+  console.error('❌ Firebase missing:', missing);
 }
 
-console.log('🔥 Firebase config:', {
-  apiKey: firebaseConfig.apiKey ? '✅ OK' : '❌ MISSING',
-  authDomain: firebaseConfig.authDomain ? '✅ OK' : '❌ MISSING',
-  projectId: firebaseConfig.projectId ? '✅ OK' : '❌ MISSING',
-  storageBucket: firebaseConfig.storageBucket ? '✅ OK' : '❌ MISSING',
-  messagingSenderId: firebaseConfig.messagingSenderId ? '✅ OK' : '❌ MISSING',
-  appId: firebaseConfig.appId ? '✅ OK' : '❌ MISSING',
+console.log('🔥 Firebase status:', {
+  apiKey: firebaseConfig.apiKey ? '✅' : '❌',
+  authDomain: firebaseConfig.authDomain ? '✅' : '❌',
+  projectId: firebaseConfig.projectId ? '✅' : '❌',
+  storageBucket: firebaseConfig.storageBucket ? '✅' : '❌',
+  messagingSenderId: firebaseConfig.messagingSenderId ? '✅' : '❌',
+  appId: firebaseConfig.appId ? '✅' : '❌',
 });
 
-// Inisialisasi Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
