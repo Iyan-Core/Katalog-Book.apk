@@ -12,7 +12,7 @@ const firebaseConfig = {
 
 // Cek apakah semua variabel terisi
 const missingVars = Object.entries(firebaseConfig)
-  .filter(([key, value]) => !value)
+  .filter(([_key, value]) => !value)  // 🔥 Pakai _key biar ga error
   .map(([key]) => key);
 
 if (missingVars.length > 0) {
