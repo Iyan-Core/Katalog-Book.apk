@@ -10,14 +10,19 @@ export async function fetchProductsFromFirestore(): Promise<Product[]> {
       throw new Error('Firestore db tidak terinisialisasi.');
     }
 
-    const productsRef = collection(db, 'products');
-    console.log('📂 Mengambil data dari collection: products');
+    // 🔥 Coba baca dari collection "products"
+    console.log('📂 Mencoba membaca collection: products');
+    let querySnapshot = await getDocs(collection(db, 'products'));
+    
+    // 🔥 Jika kosong, coba dari "product" (tanpa s)
+    if (querySnapshot.empty) {
+      console.warn('⚠️ Collection "products" kosong, mencoba "product"...');
+      querySnapshot = await getDocs(collection(db, 'product'));
+    }
 
-    const querySnapshot = await getDocs(productsRef);
     console.log(`📄 Jumlah dokumen ditemukan: ${querySnapshot.size}`);
 
     if (querySnapshot.empty) {
-      console.warn('⚠️ Collection products kosong.');
       return [];
     }
 
@@ -26,7 +31,6 @@ export async function fetchProductsFromFirestore(): Promise<Product[]> {
       const data = doc.data();
       console.log(`📦 Dokumen ${doc.id}:`, data);
       
-      // 🔥 Baca field dengan fallback
       const product: Product = {
         id: doc.id,
         name: data.name || data.nama || 'Produk',
@@ -42,7 +46,6 @@ export async function fetchProductsFromFirestore(): Promise<Product[]> {
     return products;
   } catch (error) {
     console.error('❌ Error detail:', error);
-    // Lempar error dengan pesan jelas
     throw new Error(`Gagal mengambil data: ${(error as Error).message}`);
   }
 }
