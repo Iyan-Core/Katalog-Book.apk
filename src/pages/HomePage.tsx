@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/layout/Header';
-import { fetchBooksFromFirestore } from '../api/firestore';
-import { Book, ProductDetail } from '../types/book';
+import { fetchProductsFromFirestore } from '../api/firestore';
+import { Product } from '../types/book';
 
 export default function HomePage() {
-  const [books, setBooks] = useState<Book[]>([]);
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<{ detail: ProductDetail; image: string } | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
@@ -17,10 +16,10 @@ export default function HomePage() {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchBooksFromFirestore();
-        setBooks(data);
-        if (data.length > 0) {
-          setSelectedBookId(data[0].id);
+        const data = await fetchProductsFromFirestore();
+        setProducts(data);
+        if (data.length === 0) {
+          setError('Belum ada produk di collection "products".');
         }
       } catch (err) {
         console.error('Error:', err);
@@ -32,14 +31,12 @@ export default function HomePage() {
     loadData();
   }, []);
 
-  const selectedBook = books.find(b => b.id === selectedBookId) || books[0];
-
   const handleSearch = (query: string) => {
     setSearchQuery(query);
   };
 
-  const handlePreview = (detail: ProductDetail, image: string) => {
-    setSelectedProduct({ detail, image });
+  const handlePreview = (product: Product) => {
+    setSelectedProduct(product);
     setShowPreview(true);
   };
 
@@ -48,11 +45,17 @@ export default function HomePage() {
     setSelectedProduct(null);
   };
 
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.gender.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) {
     return (
       <>
         <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>⏳ Memuat katalog...</div>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>⏳ Memuat produk...</div>
       </>
     );
   }
@@ -74,62 +77,11 @@ export default function HomePage() {
     );
   }
 
-  if (!selectedBook) {
-    return (
-      <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>📭 Belum ada buku. Tambahkan dokumen di collection "books".</p>
-        </div>
-      </>
-    );
-  }
-
-  // Gabungkan pages dengan details
-  const products = selectedBook.pages.map((image, index) => ({
-    image,
-    detail: selectedBook.details[index] || { 
-      name: `Produk ${index+1}`, 
-      gender: 'Unisex', 
-      size: '-', 
-      description: 'Deskripsi belum tersedia' 
-    }
-  }));
-
-  const filteredProducts = products.filter(p =>
-    p.detail.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.detail.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.detail.gender.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
     <>
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 {selectedBook.title}</h2>
-
-        {/* Pilihan buku jika lebih dari 1 */}
-        {books.length > 1 && (
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            {books.map(book => (
-              <button
-                key={book.id}
-                onClick={() => setSelectedBookId(book.id)}
-                style={{
-                  padding: '0.4rem 1rem',
-                  background: selectedBookId === book.id ? '#3b82f6' : '#e5e7eb',
-                  color: selectedBookId === book.id ? 'white' : '#374151',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                }}
-              >
-                {book.title}
-              </button>
-            ))}
-          </div>
-        )}
+        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>📚 Katalog Parfum</h2>
 
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '0 auto 1.5rem' }}>
           <input
@@ -163,16 +115,15 @@ export default function HomePage() {
           maxWidth: '800px',
           margin: '0 auto',
         }}>
-          {filteredProducts.map(({ image, detail }, index) => (
+          {filteredProducts.map((product) => (
             <div
-              key={index}
+              key={product.id}
               style={{
                 background: 'white',
                 borderRadius: '12px',
                 overflow: 'hidden',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                 transition: 'transform 0.2s, box-shadow 0.2s',
-                cursor: 'pointer',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'scale(1.02)';
@@ -184,8 +135,8 @@ export default function HomePage() {
               }}
             >
               <img
-                src={image}
-                alt={detail.name}
+                src={product.coverUrl}
+                alt={product.name}
                 style={{
                   width: '100%',
                   height: 'auto',
@@ -199,18 +150,22 @@ export default function HomePage() {
               />
               <div style={{ padding: '0.75rem' }}>
                 <h3 style={{ fontSize: '1rem', margin: '0 0 0.25rem 0', fontWeight: '600' }}>
-                  {detail.name}
+                  {product.name}
                 </h3>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                   <span style={{
                     fontSize: '0.75rem',
                     padding: '0.2rem 0.5rem',
                     borderRadius: '4px',
-                    background: detail.gender === 'Pria' ? '#dbeafe' : detail.gender === 'Wanita' ? '#fce4ec' : '#e8e5f0',
-                    color: detail.gender === 'Pria' ? '#1e40af' : detail.gender === 'Wanita' ? '#9c27b0' : '#4a148c',
+                    background: product.gender === 'Pria' || product.gender === 'Male' ? '#dbeafe' 
+                      : product.gender === 'Wanita' || product.gender === 'Female' ? '#fce4ec' 
+                      : '#e8e5f0',
+                    color: product.gender === 'Pria' || product.gender === 'Male' ? '#1e40af' 
+                      : product.gender === 'Wanita' || product.gender === 'Female' ? '#9c27b0' 
+                      : '#4a148c',
                     fontWeight: '500',
                   }}>
-                    {detail.gender}
+                    {product.gender}
                   </span>
                   <span style={{
                     fontSize: '0.75rem',
@@ -219,14 +174,11 @@ export default function HomePage() {
                     background: '#f3f4f6',
                     color: '#374151',
                   }}>
-                    {detail.size}
+                    {product.size}
                   </span>
                 </div>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePreview(detail, image);
-                  }}
+                  onClick={() => handlePreview(product)}
                   style={{
                     width: '100%',
                     padding: '0.5rem',
@@ -310,8 +262,8 @@ export default function HomePage() {
               ✕
             </button>
             <img
-              src={selectedProduct.image}
-              alt={selectedProduct.detail.name}
+              src={selectedProduct.coverUrl}
+              alt={selectedProduct.name}
               style={{
                 width: '100%',
                 height: 'auto',
@@ -321,17 +273,21 @@ export default function HomePage() {
               }}
             />
             <div style={{ padding: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.detail.name}</h2>
+              <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.name}</h2>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                 <span style={{
                   fontSize: '0.85rem',
                   padding: '0.25rem 0.75rem',
                   borderRadius: '4px',
-                  background: selectedProduct.detail.gender === 'Pria' ? '#dbeafe' : selectedProduct.detail.gender === 'Wanita' ? '#fce4ec' : '#e8e5f0',
-                  color: selectedProduct.detail.gender === 'Pria' ? '#1e40af' : selectedProduct.detail.gender === 'Wanita' ? '#9c27b0' : '#4a148c',
+                  background: selectedProduct.gender === 'Pria' || selectedProduct.gender === 'Male' ? '#dbeafe' 
+                    : selectedProduct.gender === 'Wanita' || selectedProduct.gender === 'Female' ? '#fce4ec' 
+                    : '#e8e5f0',
+                  color: selectedProduct.gender === 'Pria' || selectedProduct.gender === 'Male' ? '#1e40af' 
+                    : selectedProduct.gender === 'Wanita' || selectedProduct.gender === 'Female' ? '#9c27b0' 
+                    : '#4a148c',
                   fontWeight: '500',
                 }}>
-                  {selectedProduct.detail.gender}
+                  {selectedProduct.gender}
                 </span>
                 <span style={{
                   fontSize: '0.85rem',
@@ -340,11 +296,11 @@ export default function HomePage() {
                   background: '#f3f4f6',
                   color: '#374151',
                 }}>
-                  {selectedProduct.detail.size}
+                  {selectedProduct.size}
                 </span>
               </div>
-              <p style={{ fontSize: '1rem', color: '#374151', lineHeight: '1.6', margin: 0 }}>
-                {selectedProduct.detail.description}
+              <p style={{ fontSize: '1rem', color: '#374151', lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' }}>
+                {selectedProduct.desc}
               </p>
             </div>
           </div>
