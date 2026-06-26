@@ -34,8 +34,8 @@ export default function HomePage() {
         referrer: document.referrer || 'Direct',
         timestamp: new Date().toLocaleString('id-ID'),
         url: window.location.href,
-        latitude: loc?.lat,
-        longitude: loc?.lng,
+        latitude: loc?.lat ?? undefined,
+        longitude: loc?.lng ?? undefined,
       });
       setToast('✅ Notifikasi terkirim!');
     } catch {
@@ -51,44 +51,54 @@ export default function HomePage() {
       return;
     }
 
+    // Jika browser sama sekali tidak mendukung geolokasi (kasus langka)
     if (!navigator.geolocation) {
-      setToast('❌ Browser Anda tidak mendukung geolokasi.');
-      setLocationDenied(true);
+      bypassAccess(cleanEmail, null, 'Geolokasi tidak didukung browser.');
       return;
     }
 
     setIsRequestingLocation(true);
     setToast('📍 Meminta izin lokasi...');
 
-    // 🔥 Pemicu UTAMA: Harus dipanggil murni di root event handler agar lolos security Samsung & browser ketat lainnya
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        
-        // Eksekusi perubahan state setelah koordinat sukses didapat
-        sessionStorage.setItem('visitorEmail', cleanEmail);
-        setShowEmailPopup(false);
-        setLocationDenied(false);
-        setIsRequestingLocation(false);
-        
-        // Kirim notifikasi via emailjs
-        sendNotification(cleanEmail, loc);
+        executeAksesSukses(cleanEmail, loc);
       },
       (err) => {
-        console.error("Geolocation Error Code:", err.code, err.message);
-        setIsRequestingLocation(false);
-        setLocationDenied(true);
-        setToast('❌ Akses lokasi ditolak atau timeout.');
+        console.warn("Geolocation bermasalah/ditolak. Menjalankan logika bypass perangkat ketat...", err.message);
+        // 🔥 LOGIKA BYPASS UNTUK SAMSUNG & PERANGKAT KETAT LAINNYA:
+        // Tetap berikan akses masuk ke katalog walaupun GPS ditolak/gagal.
+        bypassAccess(cleanEmail, null, 'Akses lokasi dilewati/ditolak perangkat.');
       },
       { 
-        enableHighAccuracy: true, 
-        timeout: 8000, 
+        enableHighAccuracy: false, // Diganti ke false agar proses pencarian koordinat di HP Samsung jauh lebih cepat & tidak timeout
+        timeout: 6000, 
         maximumAge: 0 
       }
     );
   };
 
-  // Load produk dari Firestore setelah verifikasi sukses
+  // Fungsi helper saat lokasi sukses didapatkan
+  const executeAksesSukses = (email: string, loc: { lat: number; lng: number }) => {
+    sessionStorage.setItem('visitorEmail', email);
+    setShowEmailPopup(false);
+    setLocationDenied(false);
+    setIsRequestingLocation(false);
+    sendNotification(email, loc);
+  };
+
+  // Fungsi helper bypass khusus perangkat ketat/Samsung agar tetap bisa melihat katalog
+  const bypassAccess = (email: string, loc: null, pesanLog: string) => {
+    sessionStorage.setItem('visitorEmail', email);
+    setShowEmailPopup(false);
+    setLocationDenied(false); // Dipastikan false agar halaman penolakan tidak muncul
+    setIsRequestingLocation(false);
+    setToast('⚠️ Melanjutkan dengan akses standar.');
+    sendNotification(email, loc);
+  };
+
+  // Load produk dari Firestore setelah verifikasi lolos
   useEffect(() => {
     if (showEmailPopup || locationDenied) return;
 
@@ -110,18 +120,25 @@ export default function HomePage() {
     load();
   }, [showEmailPopup, locationDenied]);
 
-  // 🔍 FILTER SEARCH GLOBAL (Sensitif terhadap name, desc, gender, size, dan aroma)
+  // 🔍 FILTER SEARCH GLOBAL AMAN (Anti-Crash & Sensitif)
   const filtered = products.filter(p => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
 
+    // Gunakan String() untuk membungkus data agar aman dari error .toLowerCase() jika tipenya bukan string
+    const name = String(p.name ?? '').toLowerCase();
+    const desc = String(p.desc ?? '').toLowerCase();
+    const gender = String(p.gender ?? '').toLowerCase();
+    const size = String(p.size ?? '').toLowerCase();
+    // @ts-ignore
+    const aroma = String(p.aroma ?? '').toLowerCase();
+
     return (
-      (p.name?.toLowerCase().includes(query)) ||
-      (p.desc?.toLowerCase().includes(query)) ||
-      (p.gender?.toLowerCase().includes(query)) ||
-      (p.size?.toLowerCase().includes(query)) ||
-      // @ts-ignore jika property aroma belum terdefinisi di type Product asli
-      (p.aroma?.toLowerCase().includes(query))
+      name.includes(query) ||
+      desc.includes(query) ||
+      gender.includes(query) ||
+      size.includes(query) ||
+      aroma.includes(query)
     );
   });
 
@@ -159,7 +176,7 @@ export default function HomePage() {
               width: '100%', fontWeight: 'bold'
             }}
           >
-            Coba Lagi & Izinkan
+            Coba Lagi
           </button>
         </div>
       </div>
@@ -206,7 +223,7 @@ export default function HomePage() {
                 fontWeight: 'bold'
               }}
             >
-              {isRequestingLocation ? '📍 Meminta Lokasi...' : 'Kirim & Minta Izin Lokasi'}
+              {isRequestingLocation ? '📍 Memverifikasi...' : 'Masuk Katalog'}
             </button>
           </form>
         </div>
@@ -218,9 +235,9 @@ export default function HomePage() {
     content = (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
-          <h3>❌ Gagal Memuat Data</h3>
-          <p>{error}</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}>Coba Lagi</button>
+          <h3>❌ Terjadi Error</h3>
+          <p style={{ color: '#ef4444', fontWeight: '500' }}>{error}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Muat Ulang</button>
         </div>
       </div>
     );
@@ -353,7 +370,7 @@ export default function HomePage() {
       {toast && (
         <div style={{
           position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)',
-          background: toast.includes('✅') ? '#10b981' : '#ef4444', color: 'white',
+          background: toast.includes('✅') ? '#10b981' : (toast.includes('⚠️') ? '#f59e0b' : '#ef4444'), color: 'white',
           padding: '0.75rem 1.5rem', borderRadius: '8px', zIndex: 10000,
           boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: '90%', textAlign: 'center',
           animation: 'fadeInDown 0.3s ease-out', fontWeight: '500'
