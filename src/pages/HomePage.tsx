@@ -15,9 +15,7 @@ export default function HomePage() {
   const [visitorEmail, setVisitorEmail] = useState(() => localStorage.getItem('visitorEmail') || '');
   const [showEmailPopup, setShowEmailPopup] = useState(!localStorage.getItem('visitorEmail'));
   const [locationDenied, setLocationDenied] = useState(false);
-  const [isWaitingLocation, setIsWaitingLocation] = useState(false);
 
-  // Toast hilang 3 detik
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 3000);
@@ -25,7 +23,6 @@ export default function HomePage() {
     }
   }, [toast]);
 
-  // Ambil lokasi
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -40,7 +37,6 @@ export default function HomePage() {
     });
   };
 
-  // Kirim notifikasi
   const sendNotification = async (loc: { lat: number; lng: number } | null) => {
     if (!visitorEmail) return;
     try {
@@ -60,7 +56,6 @@ export default function HomePage() {
     }
   };
 
-  // Handle submit email
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!visitorEmail.trim()) {
@@ -68,13 +63,9 @@ export default function HomePage() {
       return;
     }
 
-    localStorage.setItem('visitorEmail', visitorEmail.trim());
-    setShowEmailPopup(false);
-    setIsWaitingLocation(true);
+    // 🔥 Langsung minta lokasi (popup browser akan muncul)
     setToast('📍 Meminta izin lokasi...');
-
     const loc = await getLocation();
-    setIsWaitingLocation(false);
 
     if (!loc) {
       setLocationDenied(true);
@@ -82,14 +73,17 @@ export default function HomePage() {
       return;
     }
 
+    // Lokasi diizinkan → simpan email, tutup popup, kirim notifikasi
+    localStorage.setItem('visitorEmail', visitorEmail.trim());
+    setShowEmailPopup(false);
     await sendNotification(loc);
     setToast('✅ Notifikasi terkirim!');
     setLoading(false);
   };
 
-  // Load produk (hanya jika lokasi diizinkan)
+  // Load produk setelah lokasi diizinkan
   useEffect(() => {
-    if (showEmailPopup || locationDenied || isWaitingLocation) return;
+    if (showEmailPopup || locationDenied) return;
     const load = async () => {
       try {
         setLoading(true);
@@ -106,7 +100,7 @@ export default function HomePage() {
       }
     };
     load();
-  }, [showEmailPopup, locationDenied, isWaitingLocation]);
+  }, [showEmailPopup, locationDenied]);
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -117,7 +111,6 @@ export default function HomePage() {
   const SHOP_LINK = 'https://shop.example.com'; // Ganti dengan link shop Anda
 
   // ========== RENDER ==========
-
   let content;
 
   if (locationDenied) {
@@ -225,46 +218,6 @@ export default function HomePage() {
               Kirim & Lanjutkan
             </button>
           </form>
-        </div>
-      </div>
-    );
-  } else if (isWaitingLocation) {
-    content = (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: '1rem',
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '16px',
-          padding: '2rem',
-          maxWidth: '400px',
-          width: '100%',
-          textAlign: 'center',
-        }}>
-          <h3>📍 Meminta Izin Lokasi</h3>
-          <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-            Mohon izinkan akses lokasi di browser.
-          </p>
-          <div style={{ width: '100%', height: '4px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ width: '100%', height: '100%', background: '#3b82f6', animation: 'pulse 1.5s infinite' }} />
-          </div>
-          <style>{`
-            @keyframes pulse {
-              0% { opacity: 0.3; }
-              50% { opacity: 1; }
-              100% { opacity: 0.3; }
-            }
-          `}</style>
         </div>
       </div>
     );
@@ -408,8 +361,6 @@ export default function HomePage() {
         >
           💬
         </button>
-
-        {/* Ikon email DIHAPUS (tidak ada lagi) */}
 
         {showPreview && selectedProduct && (
           <div
