@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { BookState } from '../types/book';
 
 export function useBook(totalPages: number) {
@@ -8,18 +8,17 @@ export function useBook(totalPages: number) {
     isFlipping: false,
   });
 
-  // 📌 Pakai useCallback agar fungsi tidak berubah
-  const goToPage = useCallback((page: number) => {
+  const goToPage = (page: number) => {
     if (page < 0 || page >= totalPages || state.isFlipping) return;
-    setState((prev) => ({ ...prev, currentPage: page }));
-  }, [totalPages, state.isFlipping]);
+    setState((prev: BookState) => ({ ...prev, currentPage: page }));
+  };
 
-  const nextPage = useCallback(() => goToPage(state.currentPage + 1), [goToPage, state.currentPage]);
-  const prevPage = useCallback(() => goToPage(state.currentPage - 1), [goToPage, state.currentPage]);
+  const nextPage = () => goToPage(state.currentPage + 1);
+  const prevPage = () => goToPage(state.currentPage - 1);
 
-  const setFlipping = useCallback((flipping: boolean) => {
-    setState((prev) => ({ ...prev, isFlipping: flipping }));
-  }, []);
+  const setFlipping = (flipping: boolean) => {
+    setState((prev: BookState) => ({ ...prev, isFlipping: flipping }));
+  };
 
   return { state, goToPage, nextPage, prevPage, setFlipping };
 }
