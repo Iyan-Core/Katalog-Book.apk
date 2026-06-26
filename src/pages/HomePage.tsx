@@ -21,9 +21,10 @@ export default function HomePage() {
         const data = await fetchProductsFromFirestore();
         console.log('📦 Data diterima:', data.length);
         
-        setProducts(data);
         if (data.length === 0) {
-          setError('⚠️ Collection "products" kosong. Tambahkan data di Firebase.');
+          setError('⚠️ Collection "products" kosong. Tambahkan data di Firebase Console.');
+        } else {
+          setProducts(data);
         }
       } catch (err) {
         console.error('❌ Error di HomePage:', err);
@@ -35,8 +36,12 @@ export default function HomePage() {
     loadData();
   }, []);
 
-  // ... sisanya sama seperti sebelumnya (grid, search, preview)
-  // (saya potong agar tidak terlalu panjang, tapi tetap sama)
+  // Filter produk
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.gender.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -64,14 +69,19 @@ export default function HomePage() {
     );
   }
 
-  // ... lanjut render grid (sama seperti sebelumnya)
-  // Saya sertakan di bawah agar lengkap
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.gender.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Jika produk kosong
+  if (products.length === 0) {
+    return (
+      <>
+        <Header />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <p>📭 Belum ada produk. Tambahkan data di collection "products".</p>
+        </div>
+      </>
+    );
+  }
 
+  // Tampilan Grid
   return (
     <>
       <Header />
@@ -93,11 +103,6 @@ export default function HomePage() {
               outline: 'none',
             }}
           />
-          {searchQuery && (
-            <p style={{ fontSize: '0.9rem', color: '#6b7280', marginTop: '0.5rem', textAlign: 'center' }}>
-              Menampilkan {filteredProducts.length} dari {products.length} produk
-            </p>
-          )}
         </div>
 
         <div style={{
@@ -191,7 +196,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Modal Preview (sama seperti sebelumnya) */}
+      {/* Modal Preview */}
       {showPreview && selectedProduct && (
         <div
           style={{
