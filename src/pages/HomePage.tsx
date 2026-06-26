@@ -51,48 +51,46 @@ export default function HomePage() {
       return;
     }
 
-    // Jika browser sama sekali tidak mendukung geolokasi (kasus langka)
     if (!navigator.geolocation) {
-      bypassAccess(cleanEmail, null, 'Geolokasi tidak didukung browser.');
+      bypassAccess(cleanEmail, null);
       return;
     }
 
-    setIsRequestingLocation(true);
-    setToast('📍 Meminta izin lokasi...');
-
+    // 🔥 SOLUSI UTAMA SAMSUNG: Panggil Geolocation SEGERA di baris pertama tanpa interupsi state
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        executeAksesSukses(cleanEmail, loc);
+        
+        // State diubah HANYA setelah sukses mendapatkan koordinat
+        sessionStorage.setItem('visitorEmail', cleanEmail);
+        setShowEmailPopup(false);
+        setLocationDenied(false);
+        setIsRequestingLocation(false);
+        
+        sendNotification(cleanEmail, loc);
       },
       (err) => {
-        console.warn("Geolocation bermasalah/ditolak. Menjalankan logika bypass perangkat ketat...", err.message);
-        // 🔥 LOGIKA BYPASS UNTUK SAMSUNG & PERANGKAT KETAT LAINNYA:
-        // Tetap berikan akses masuk ke katalog walaupun GPS ditolak/gagal.
-        bypassAccess(cleanEmail, null, 'Akses lokasi dilewati/ditolak perangkat.');
+        console.warn("Geolocation bermasalah/ditolak perangkat:", err.message);
+        // Fallback bypass jika perangkat memblokir pop-up izin browser
+        bypassAccess(cleanEmail, null);
       },
       { 
-        enableHighAccuracy: false, // Diganti ke false agar proses pencarian koordinat di HP Samsung jauh lebih cepat & tidak timeout
+        enableHighAccuracy: false, // Diset false agar HP Samsung tidak hang/timeout saat mengunci sinyal GPS
         timeout: 6000, 
         maximumAge: 0 
       }
     );
+
+    // Set indikator loading setelah geolokasi dipicu secara sinkron
+    setIsRequestingLocation(true);
+    setToast('📍 Meminta izin lokasi...');
   };
 
-  // Fungsi helper saat lokasi sukses didapatkan
-  const executeAksesSukses = (email: string, loc: { lat: number; lng: number }) => {
+  // Fungsi helper bypass khusus perangkat ketat (Menghapus parameter 'pesanLog' agar lolos build)
+  const bypassAccess = (email: string, loc: null) => {
     sessionStorage.setItem('visitorEmail', email);
     setShowEmailPopup(false);
-    setLocationDenied(false);
-    setIsRequestingLocation(false);
-    sendNotification(email, loc);
-  };
-
-  // Fungsi helper bypass khusus perangkat ketat/Samsung agar tetap bisa melihat katalog
-  const bypassAccess = (email: string, loc: null, pesanLog: string) => {
-    sessionStorage.setItem('visitorEmail', email);
-    setShowEmailPopup(false);
-    setLocationDenied(false); // Dipastikan false agar halaman penolakan tidak muncul
+    setLocationDenied(false); 
     setIsRequestingLocation(false);
     setToast('⚠️ Melanjutkan dengan akses standar.');
     sendNotification(email, loc);
@@ -125,7 +123,6 @@ export default function HomePage() {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
 
-    // Gunakan String() untuk membungkus data agar aman dari error .toLowerCase() jika tipenya bukan string
     const name = String(p.name ?? '').toLowerCase();
     const desc = String(p.desc ?? '').toLowerCase();
     const gender = String(p.gender ?? '').toLowerCase();
