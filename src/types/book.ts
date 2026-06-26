@@ -1,17 +1,16 @@
-export interface Product {
-  id: string;
+export interface ProductDetail {
   name: string;
-  imageUrl: string;
-  description: string;
-  gender: 'Pria' | 'Wanita' | 'Unisex';
+  gender: string;
   size: string;
+  description: string;
 }
 
 export interface Book {
   id: string;
   title: string;
   coverUrl: string;
-  products: Product[];
+  pages: string[];
+  details: ProductDetail[];
 }
 
 export interface BookState {
