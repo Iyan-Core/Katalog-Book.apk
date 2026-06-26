@@ -45,7 +45,8 @@ export default function HomePage() {
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!visitorEmail.trim()) {
+    const cleanEmail = visitorEmail.trim();
+    if (!cleanEmail) {
       setToast('❌ Email wajib diisi.');
       return;
     }
@@ -56,32 +57,33 @@ export default function HomePage() {
       return;
     }
 
-    setToast('📍 Meminta izin lokasi...');
     setIsRequestingLocation(true);
+    setToast('📍 Meminta izin lokasi...');
 
-    // Jalankan langsung tanpa pembungkus async berbelit agar lolos security policy browser mobile
+    // 🔥 Pemicu UTAMA: Harus dipanggil murni di root event handler agar lolos security Samsung & browser ketat lainnya
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         
-        sessionStorage.setItem('visitorEmail', visitorEmail.trim());
+        // Eksekusi perubahan state setelah koordinat sukses didapat
+        sessionStorage.setItem('visitorEmail', cleanEmail);
         setShowEmailPopup(false);
         setLocationDenied(false);
         setIsRequestingLocation(false);
         
-        // Kirim email notification
-        await sendNotification(visitorEmail.trim(), loc);
+        // Kirim notifikasi via emailjs
+        sendNotification(cleanEmail, loc);
       },
       (err) => {
-        console.error("Geolocation error:", err);
+        console.error("Geolocation Error Code:", err.code, err.message);
         setIsRequestingLocation(false);
         setLocationDenied(true);
         setToast('❌ Akses lokasi ditolak atau timeout.');
       },
       { 
         enableHighAccuracy: true, 
-        timeout: 12000, 
-        maximumAge: 0 // Memaksa browser meminta GPS baru, bukan mengambil cache lama
+        timeout: 8000, 
+        maximumAge: 0 
       }
     );
   };
@@ -108,11 +110,20 @@ export default function HomePage() {
     load();
   }, [showEmailPopup, locationDenied]);
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.gender.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // 🔍 FILTER SEARCH GLOBAL (Sensitif terhadap name, desc, gender, size, dan aroma)
+  const filtered = products.filter(p => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+
+    return (
+      (p.name?.toLowerCase().includes(query)) ||
+      (p.desc?.toLowerCase().includes(query)) ||
+      (p.gender?.toLowerCase().includes(query)) ||
+      (p.size?.toLowerCase().includes(query)) ||
+      // @ts-ignore jika property aroma belum terdefinisi di type Product asli
+      (p.aroma?.toLowerCase().includes(query))
+    );
+  });
 
   const SHOP_LINK = 'https://shop.example.com'; 
 
@@ -219,7 +230,7 @@ export default function HomePage() {
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '1.5rem auto' }}>
           <input
             type="text"
-            placeholder="🔍 Cari produk..."
+            placeholder="🔍 Cari produk, ukuran, atau aroma..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
