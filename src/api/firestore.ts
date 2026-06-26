@@ -1,6 +1,6 @@
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Book, ProductDetail } from '../types/book';
+import { Book } from '../types/book';
 
 export async function fetchBooksFromFirestore(): Promise<Book[]> {
   try {
