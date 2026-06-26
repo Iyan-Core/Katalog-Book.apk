@@ -1,23 +1,25 @@
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Book } from '../types/book';
+import { Product } from '../types/book';
 
-export async function fetchBooksFromFirestore(): Promise<Book[]> {
+export async function fetchProductsFromFirestore(): Promise<Product[]> {
   try {
-    const querySnapshot = await getDocs(collection(db, 'books'));
-    const books: Book[] = [];
+    const querySnapshot = await getDocs(collection(db, 'products'));
+    const products: Product[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      books.push({
+      products.push({
         id: doc.id,
-        title: data.title || 'Katalog',
-        coverUrl: data.coverUrl || data.pages?.[0] || '',
-        pages: Array.isArray(data.pages) ? data.pages : [],
+        name: data.name || 'Produk',
+        imageUrl: data.imageUrl || '',
+        description: data.description || '',
+        gender: data.gender || 'Unisex',
+        size: data.size || '',
       });
     });
-    return books;
+    return products;
   } catch (error) {
-    console.error('Error fetching books from Firestore:', error);
+    console.error('Error fetching products from Firestore:', error);
     throw error;
   }
 }
