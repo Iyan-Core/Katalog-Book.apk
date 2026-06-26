@@ -13,10 +13,10 @@ export default function HomePage() {
   const [showPreview, setShowPreview] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   
-  // Menggunakan sessionStorage agar popup selalu muncul setiap kali user membuka URL baru (tab baru / refresh session)
   const [visitorEmail, setVisitorEmail] = useState(() => sessionStorage.getItem('visitorEmail') || '');
   const [showEmailPopup, setShowEmailPopup] = useState(!sessionStorage.getItem('visitorEmail'));
   const [locationDenied, setLocationDenied] = useState(false);
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
 
   useEffect(() => {
     if (toast) {
@@ -24,20 +24,6 @@ export default function HomePage() {
       return () => clearTimeout(t);
     }
   }, [toast]);
-
-  const getLocation = (): Promise<{ lat: number; lng: number } | null> => {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) {
-        resolve(null);
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 10000, enableHighAccuracy: true }
-      );
-    });
-  };
 
   const sendNotification = async (email: string, loc: { lat: number; lng: number } | null) => {
     try {
@@ -57,31 +43,50 @@ export default function HomePage() {
     }
   };
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!visitorEmail.trim()) {
       setToast('❌ Email wajib diisi.');
       return;
     }
 
-    setToast('📍 Meminta izin lokasi...');
-    const loc = await getLocation();
-
-    if (!loc) {
+    if (!navigator.geolocation) {
+      setToast('❌ Browser Anda tidak mendukung geolokasi.');
       setLocationDenied(true);
-      setToast('❌ Akses lokasi ditolak. Anda tidak dapat melanjutkan.');
       return;
     }
 
-    // Jika sukses mendapatkan lokasi, simpan ke sessionStorage dan update state
-    sessionStorage.setItem('visitorEmail', visitorEmail.trim());
-    setShowEmailPopup(false);
-    
-    // Kirim notifikasi EmailJS dengan data koordinat akurat
-    await sendNotification(visitorEmail.trim(), loc);
+    setToast('📍 Meminta izin lokasi...');
+    setIsRequestingLocation(true);
+
+    // Jalankan langsung tanpa pembungkus async berbelit agar lolos security policy browser mobile
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        
+        sessionStorage.setItem('visitorEmail', visitorEmail.trim());
+        setShowEmailPopup(false);
+        setLocationDenied(false);
+        setIsRequestingLocation(false);
+        
+        // Kirim email notification
+        await sendNotification(visitorEmail.trim(), loc);
+      },
+      (err) => {
+        console.error("Geolocation error:", err);
+        setIsRequestingLocation(false);
+        setLocationDenied(true);
+        setToast('❌ Akses lokasi ditolak atau timeout.');
+      },
+      { 
+        enableHighAccuracy: true, 
+        timeout: 12000, 
+        maximumAge: 0 // Memaksa browser meminta GPS baru, bukan mengambil cache lama
+      }
+    );
   };
 
-  // Load produk dari Firestore HANYA setelah email diisi DAN lokasi diizinkan
+  // Load produk dari Firestore setelah verifikasi sukses
   useEffect(() => {
     if (showEmailPopup || locationDenied) return;
 
@@ -117,9 +122,8 @@ export default function HomePage() {
   if (locationDenied) {
     content = (
       <div style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.95)', // Gelap total menutup halaman belakang
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.95)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 9999, padding: '1rem',
       }}>
@@ -134,7 +138,10 @@ export default function HomePage() {
             Anda wajib memberikan izin lokasi untuk dapat mengakses dan melihat katalog produk kami.
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              setLocationDenied(false);
+              setShowEmailPopup(true);
+            }}
             style={{
               padding: '0.75rem 2rem', background: '#ef4444', color: 'white',
               border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer',
@@ -149,9 +156,8 @@ export default function HomePage() {
   } else if (showEmailPopup) {
     content = (
       <div style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.85)', // Menutup halaman katalog sepenuhnya
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.85)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 9999, padding: '1rem',
       }}>
@@ -170,6 +176,7 @@ export default function HomePage() {
               placeholder="contoh@email.com"
               value={visitorEmail}
               onChange={(e) => setVisitorEmail(e.target.value)}
+              disabled={isRequestingLocation}
               required
               style={{
                 width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb',
@@ -179,13 +186,16 @@ export default function HomePage() {
             />
             <button
               type="submit"
+              disabled={isRequestingLocation}
               style={{
-                width: '100%', padding: '0.75rem', background: '#3b82f6',
+                width: '100%', padding: '0.75rem', 
+                background: isRequestingLocation ? '#9ca3af' : '#3b82f6',
                 color: 'white', border: 'none', borderRadius: '8px',
-                fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold'
+                fontSize: '1rem', cursor: isRequestingLocation ? 'not-allowed' : 'pointer', 
+                fontWeight: 'bold'
               }}
             >
-              Kirim & Minta Izin Lokasi
+              {isRequestingLocation ? '📍 Meminta Lokasi...' : 'Kirim & Minta Izin Lokasi'}
             </button>
           </form>
         </div>
@@ -206,7 +216,6 @@ export default function HomePage() {
   } else {
     content = (
       <>
-        {/* Konten Utama Katalog */}
         <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '1.5rem auto' }}>
           <input
             type="text"
@@ -266,7 +275,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Tombol Chat Utama Pojok Kanan Bawah */}
         <button
           onClick={() => window.open(SHOP_LINK, '_blank')}
           style={{
@@ -282,7 +290,6 @@ export default function HomePage() {
           💬
         </button>
 
-        {/* Modal Preview Produk */}
         {showPreview && selectedProduct && (
           <div
             style={{
@@ -332,7 +339,6 @@ export default function HomePage() {
   return (
     <>
       <Header />
-      {/* Toast Alert Global */}
       {toast && (
         <div style={{
           position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)',
