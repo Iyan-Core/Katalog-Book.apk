@@ -10,5 +10,15 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// Cek apakah semua variabel terisi
+const missingVars = Object.entries(firebaseConfig)
+  .filter(([key, value]) => !value)
+  .map(([key]) => key);
+
+if (missingVars.length > 0) {
+  console.error('Firebase config missing:', missingVars);
+  throw new Error(`Firebase config missing: ${missingVars.join(', ')}`);
+}
+
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
