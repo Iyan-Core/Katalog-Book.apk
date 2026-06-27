@@ -14,12 +14,12 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showZoom, setShowZoom] = useState(false);
 
-  // Ambil data produk dari Firestore
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         const data = await fetchProductsFromFirestore();
+        console.log('🔥 Total produk dari Firestore:', data.length);
         if (data.length === 0) {
           setError('📭 Belum ada produk di Firestore.');
         } else {
@@ -34,26 +34,22 @@ export default function HomePage() {
     load();
   }, []);
 
-  // Group produk berdasarkan size
+  // 🔥 Group produk berdasarkan size, dan tambahkan "Lainnya" untuk yang tidak punya size
   const sizeGroups = allProducts.reduce((acc, p) => {
-    const size = p.size || 'Uncategorized';
+    const size = p.size && p.size.trim() !== '' ? p.size : 'Lainnya';
     if (!acc[size]) acc[size] = [];
     acc[size].push(p);
     return acc;
   }, {} as Record<string, Product[]>);
 
   const sizeKeys = Object.keys(sizeGroups);
-
-  // Produk berdasarkan size yang dipilih
   const filteredProducts = selectedSize ? sizeGroups[selectedSize] || [] : [];
 
-  // Fungsi kembali ke daftar kategori
   const goBack = () => {
     setViewMode('categories');
     setSelectedSize(null);
   };
 
-  // Fungsi buka zoom produk
   const openZoom = (product: Product) => {
     setSelectedProduct(product);
     setShowZoom(true);
@@ -101,7 +97,6 @@ export default function HomePage() {
       }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
 
-          {/* Tombol kembali (jika di mode produk) */}
           {viewMode === 'products' && (
             <button
               onClick={goBack}
@@ -119,18 +114,13 @@ export default function HomePage() {
                 gap: '0.5rem',
                 transition: 'all 0.3s',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,215,0,0.25)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,215,0,0.15)';
-              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,215,0,0.25)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,215,0,0.15)'}
             >
               ← Kembali ke Daftar
             </button>
           )}
 
-          {/* Mode Kategori (Cover Card) */}
           {viewMode === 'categories' && (
             <>
               <h2 style={{
@@ -155,11 +145,12 @@ export default function HomePage() {
                 Pilih ukuran untuk melihat koleksi
               </p>
 
+              {/* 🔥 2 KOLOM TETAP */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '2rem',
-                maxWidth: '900px',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '1.5rem',
+                maxWidth: '600px',
                 margin: '0 auto',
               }}>
                 {sizeKeys.map((size) => {
@@ -183,7 +174,6 @@ export default function HomePage() {
                         cursor: 'pointer',
                         transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                         boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                        position: 'relative',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
@@ -251,7 +241,6 @@ export default function HomePage() {
             </>
           )}
 
-          {/* Mode Produk (Grid 4 Kolom) */}
           {viewMode === 'products' && selectedSize && (
             <>
               <h2 style={{
@@ -346,6 +335,18 @@ export default function HomePage() {
                         }}>
                           {product.size}
                         </span>
+                        {product.kategori && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '0.15rem 0.6rem',
+                            borderRadius: '20px',
+                            background: 'rgba(255,255,255,0.03)',
+                            color: 'rgba(255,255,255,0.3)',
+                            border: '1px solid rgba(255,255,255,0.03)',
+                          }}>
+                            {product.kategori}
+                          </span>
+                        )}
                       </div>
                       <p style={{
                         color: 'rgba(255,255,255,0.3)',
@@ -374,7 +375,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Modal Zoom */}
       {showZoom && selectedProduct && (
         <div
           style={{
