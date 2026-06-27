@@ -1,7 +1,7 @@
 export interface Product {
   id: string;
   name: string;
-  coverUrl: string;
+  images?: string[];
   gender: string;
   size: string;
   desc: string;
