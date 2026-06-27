@@ -53,14 +53,11 @@ export default function HomePage() {
     setIsRequestingLocation(true);
     setToast('📍 Meminta izin lokasi...');
 
-    // Jika browser dijalankan di lingkungan non-secure yang memblokir API geolocation
     if (!navigator.geolocation) {
       bypassAccess(cleanEmail, null);
       return;
     }
 
-    // Timer perlindungan khusus Samsung: Jika dalam 4 detik popup bawaan diblokir/tidak muncul,
-    // langsung bypass user ke katalog agar tidak stuck selamanya di loading spinner.
     const forceBypassTimer = setTimeout(() => {
       console.warn("Popup diblokir sistem browser perangkat. Melakukan bypass otomatis...");
       bypassAccess(cleanEmail, null);
@@ -82,13 +79,12 @@ export default function HomePage() {
       (err) => {
         clearTimeout(forceBypassTimer);
         console.warn("Geolocation rejected/error:", err.message);
-        // Jika user klik 'Deny' atau sistem menolak, langsung loloskan tanpa menampilkan layar merah blokir
         bypassAccess(cleanEmail, null);
       },
       { 
-        enableHighAccuracy: false, // Wajib false agar satelit GPS tidak mencari sinyal terlalu lama di background
+        enableHighAccuracy: false, 
         timeout: 4000, 
-        maximumAge: Infinity // Mengizinkan cache lokasi instan agar popup browser terpancing keluar lebih cepat
+        maximumAge: Infinity 
       }
     );
   };
@@ -245,7 +241,7 @@ export default function HomePage() {
   } else {
     content = (
       <>
-        <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '1.5rem auto' }}>
+        <div style={{ marginBottom: '1.5rem', maxWidth: '600px', margin: '1.5rem auto', padding: '0 1rem' }}>
           <input
             type="text"
             placeholder="🔍 Cari produk, ukuran, atau aroma..."
@@ -258,9 +254,10 @@ export default function HomePage() {
           />
         </div>
 
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '1rem', maxWidth: '800px', margin: '0 auto', padding: '0 1rem 5rem'
+        {/* 🔥 PERUBAHAN GRID: class "product-grid" ditambahkan untuk support 4 kolom responsif */}
+        <div className="product-grid" style={{
+          display: 'grid',
+          gap: '1.25rem', maxWidth: '1200px', margin: '0 auto', padding: '0 1rem 5rem'
         }}>
           {filtered.map((p) => (
             <div
@@ -268,19 +265,24 @@ export default function HomePage() {
               style={{
                 background: 'white', borderRadius: '12px',
                 overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
               }}
             >
-              <img
-                src={p.coverUrl}
-                alt={p.name}
-                style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
-              />
-              <div style={{ padding: '0.75rem' }}>
-                <h3 style={{ fontSize: '1rem', margin: '0 0 0.25rem 0', color: '#1f2937' }}>{p.name}</h3>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#e5e7eb', color: '#374151' }}>{p.gender}</span>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#f3f4f6', color: '#374151' }}>{p.size}</span>
+              <div>
+                <img
+                  src={p.coverUrl}
+                  alt={p.name}
+                  style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
+                />
+                <div style={{ padding: '0.75rem 0.75rem 0 0.75rem' }}>
+                  <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.25rem 0', color: '#1f2937', fontWeight: '600' }}>{p.name}</h3>
+                  <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#e5e7eb', color: '#374151' }}>{p.gender}</span>
+                    <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#f3f4f6', color: '#374151' }}>{p.size}</span>
+                  </div>
                 </div>
+              </div>
+              <div style={{ padding: '0 0.75rem 0.75rem 0.75rem' }}>
                 <button
                   onClick={() => {
                     setSelectedProduct(p);
@@ -288,7 +290,8 @@ export default function HomePage() {
                   }}
                   style={{
                     width: '100%', padding: '0.5rem', background: '#3b82f6',
-                    color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer'
+                    color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                    fontSize: '0.85rem', fontWeight: '500'
                   }}
                 >
                   👁️ Preview
@@ -380,7 +383,22 @@ export default function HomePage() {
         </div>
       )}
       {content}
+      
+      {/* 🔥 MEDIA QUERY CSS: Mengatur 2 kolom pada HP dan otomatis menjadi 4 kolom di layar lebar */}
       <style>{`
+        .product-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        @media (min-width: 768px) {
+          .product-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (min-width: 1024px) {
+          .product-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+        }
         @keyframes fadeInDown {
           from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
