@@ -234,7 +234,7 @@ export default function HomePage() {
         <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
           <h3>❌ Terjadi Error</h3>
           <p style={{ color: '#ef4444', fontWeight: '500' }}>{error}</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Muat Ulang</button>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Muat Olang</button>
         </div>
       </div>
     );
@@ -254,51 +254,56 @@ export default function HomePage() {
           />
         </div>
 
-        {/* 🔥 PERUBAHAN GRID: class "product-grid" ditambahkan untuk support 4 kolom responsif */}
         <div className="product-grid" style={{
           display: 'grid',
           gap: '1.25rem', maxWidth: '1200px', margin: '0 auto', padding: '0 1rem 5rem'
         }}>
-          {filtered.map((p) => (
-            <div
-              key={p.id}
-              style={{
-                background: 'white', borderRadius: '12px',
-                overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
-              }}
-            >
-              <div>
-                <img
-                  src={p.coverUrl}
-                  alt={p.name}
-                  style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
-                />
-                <div style={{ padding: '0.75rem 0.75rem 0 0.75rem' }}>
-                  <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.25rem 0', color: '#1f2937', fontWeight: '600' }}>{p.name}</h3>
-                  <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#e5e7eb', color: '#374151' }}>{p.gender}</span>
-                    <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#f3f4f6', color: '#374151' }}>{p.size}</span>
+          {filtered.map((p) => {
+            // 🔥 Mengambil gambar pertama dari array images (Firestore) sebagai cover, fallback ke string kosong jika data undefined
+            // @ts-ignore
+            const productCover = p.images && p.images.length > 0 ? p.images[0] : '';
+
+            return (
+              <div
+                key={p.id}
+                style={{
+                  background: 'white', borderRadius: '12px',
+                  overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+                }}
+              >
+                <div>
+                  <img
+                    src={productCover}
+                    alt={p.name}
+                    style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block', background: '#f3f4f6' }}
+                  />
+                  <div style={{ padding: '0.75rem 0.75rem 0 0.75rem' }}>
+                    <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.25rem 0', color: '#1f2937', fontWeight: '600' }}>{p.name}</h3>
+                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#e5e7eb', color: '#374151' }}>{p.gender}</span>
+                      <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#f3f4f6', color: '#374151' }}>{p.size}</span>
+                    </div>
                   </div>
                 </div>
+                <div style={{ padding: '0 0.75rem 0.75rem 0.75rem' }}>
+                  <button
+                    onClick={() => {
+                      setSelectedProduct(p);
+                      setShowPreview(true);
+                    }}
+                    style={{
+                      width: '100%', padding: '0.5rem', background: '#3b82f6',
+                      color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                      fontSize: '0.85rem', fontWeight: '500'
+                    }}
+                  >
+                    👁️ Preview
+                  </button>
+                </div>
               </div>
-              <div style={{ padding: '0 0.75rem 0.75rem 0.75rem' }}>
-                <button
-                  onClick={() => {
-                    setSelectedProduct(p);
-                    setShowPreview(true);
-                  }}
-                  style={{
-                    width: '100%', padding: '0.5rem', background: '#3b82f6',
-                    color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer',
-                    fontSize: '0.85rem', fontWeight: '500'
-                  }}
-                >
-                  👁️ Preview
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {filtered.length === 0 && (
@@ -349,7 +354,8 @@ export default function HomePage() {
                 ✕
               </button>
               <img
-                src={selectedProduct.coverUrl}
+                // @ts-ignore
+                src={selectedProduct.images && selectedProduct.images.length > 0 ? selectedProduct.images[0] : ''}
                 alt={selectedProduct.name}
                 style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
               />
@@ -384,7 +390,6 @@ export default function HomePage() {
       )}
       {content}
       
-      {/* 🔥 MEDIA QUERY CSS: Mengatur 2 kolom pada HP dan otomatis menjadi 4 kolom di layar lebar */}
       <style>{`
         .product-grid {
           grid-template-columns: repeat(2, 1fr);
