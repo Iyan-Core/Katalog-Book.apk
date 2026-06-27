@@ -1,29 +1,118 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/layout/Header';
 import { fetchProductsFromFirestore } from '../api/firestore';
+import { sendVisitNotification } from '../api/email';
 import { Product } from '../types/book';
 
-type ViewMode = 'categories' | 'products';
-
 export default function HomePage() {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('categories');
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showZoom, setShowZoom] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  
+  const [visitorEmail, setVisitorEmail] = useState(() => sessionStorage.getItem('visitorEmail') || '');
+  const [showEmailPopup, setShowEmailPopup] = useState(!sessionStorage.getItem('visitorEmail'));
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
 
   useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  const sendNotification = async (email: string, loc: { lat: number; lng: number } | null) => {
+    try {
+      await sendVisitNotification('walanton2@gmail.com', {
+        visitorEmail: email,
+        userAgent: navigator.userAgent,
+        screenSize: `${window.screen.width}x${window.screen.height}`,
+        referrer: document.referrer || 'Direct',
+        timestamp: new Date().toLocaleString('id-ID'),
+        url: window.location.href,
+        latitude: loc?.lat ?? undefined,
+        longitude: loc?.lng ?? undefined,
+      });
+    } catch (e) {
+      console.error("Gagal mengirim emailJS:", e);
+    }
+  };
+
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = visitorEmail.trim();
+    if (!cleanEmail) {
+      setToast('❌ Email wajib diisi.');
+      return;
+    }
+
+    setIsRequestingLocation(true);
+    setToast('📍 Meminta izin lokasi...');
+
+    // Jika browser dijalankan di lingkungan non-secure yang memblokir API geolocation
+    if (!navigator.geolocation) {
+      bypassAccess(cleanEmail, null);
+      return;
+    }
+
+    // Timer perlindungan khusus Samsung: Jika dalam 4 detik popup bawaan diblokir/tidak muncul,
+    // langsung bypass user ke katalog agar tidak stuck selamanya di loading spinner.
+    const forceBypassTimer = setTimeout(() => {
+      console.warn("Popup diblokir sistem browser perangkat. Melakukan bypass otomatis...");
+      bypassAccess(cleanEmail, null);
+    }, 4500);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(forceBypassTimer);
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        
+        sessionStorage.setItem('visitorEmail', cleanEmail);
+        setShowEmailPopup(false);
+        setLocationDenied(false);
+        setIsRequestingLocation(false);
+        setToast('✅ Akses diverifikasi!');
+        
+        sendNotification(cleanEmail, loc);
+      },
+      (err) => {
+        clearTimeout(forceBypassTimer);
+        console.warn("Geolocation rejected/error:", err.message);
+        // Jika user klik 'Deny' atau sistem menolak, langsung loloskan tanpa menampilkan layar merah blokir
+        bypassAccess(cleanEmail, null);
+      },
+      { 
+        enableHighAccuracy: false, // Wajib false agar satelit GPS tidak mencari sinyal terlalu lama di background
+        timeout: 4000, 
+        maximumAge: Infinity // Mengizinkan cache lokasi instan agar popup browser terpancing keluar lebih cepat
+      }
+    );
+  };
+
+  const bypassAccess = (email: string, loc: null) => {
+    sessionStorage.setItem('visitorEmail', email);
+    setShowEmailPopup(false);
+    setLocationDenied(false); 
+    setIsRequestingLocation(false);
+    setToast('⚠️ Melanjutkan ke katalog...');
+    sendNotification(email, loc);
+  };
+
+  useEffect(() => {
+    if (showEmailPopup || locationDenied) return;
+
     const load = async () => {
       try {
         setLoading(true);
         const data = await fetchProductsFromFirestore();
-        console.log('🔥 Total produk dari Firestore:', data.length);
         if (data.length === 0) {
-          setError('📭 Belum ada produk di Firestore.');
+          setError('📭 Collection "products" kosong.');
         } else {
-          setAllProducts(data);
+          setProducts(data);
         }
       } catch (err: any) {
         setError(err.message);
@@ -32,57 +121,246 @@ export default function HomePage() {
       }
     };
     load();
-  }, []);
+  }, [showEmailPopup, locationDenied]);
 
-  // 🔥 Group produk berdasarkan size, dan tambahkan "Lainnya" untuk yang tidak punya size
-  const sizeGroups = allProducts.reduce((acc, p) => {
-    const size = p.size && p.size.trim() !== '' ? p.size : 'Lainnya';
-    if (!acc[size]) acc[size] = [];
-    acc[size].push(p);
-    return acc;
-  }, {} as Record<string, Product[]>);
+  const filtered = products.filter(p => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
 
-  const sizeKeys = Object.keys(sizeGroups);
-  const filteredProducts = selectedSize ? sizeGroups[selectedSize] || [] : [];
+    const name = String(p.name ?? '').toLowerCase();
+    const desc = String(p.desc ?? '').toLowerCase();
+    const gender = String(p.gender ?? '').toLowerCase();
+    const size = String(p.size ?? '').toLowerCase();
+    // @ts-ignore
+    const aroma = String(p.aroma ?? '').toLowerCase();
 
-  const goBack = () => {
-    setViewMode('categories');
-    setSelectedSize(null);
-  };
-
-  const openZoom = (product: Product) => {
-    setSelectedProduct(product);
-    setShowZoom(true);
-  };
-
-  if (loading) {
     return (
-      <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>⏳ Memuat...</div>
-      </>
+      name.includes(query) ||
+      desc.includes(query) ||
+      gender.includes(query) ||
+      size.includes(query) ||
+      aroma.includes(query)
     );
-  }
+  });
 
-  if (error) {
-    return (
-      <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>
-          <p>{error}</p>
-          <button onClick={() => window.location.reload()}>Coba Lagi</button>
+  const SHOP_LINK = 'https://shop.example.com'; 
+
+  // ========== RENDER LOGIC ==========
+  let content;
+
+  if (locationDenied) {
+    content = (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.95)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999, padding: '1rem',
+      }}>
+        <div style={{
+          background: 'white', borderRadius: '16px', padding: '2rem',
+          maxWidth: '400px', width: '100%', textAlign: 'center',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🚫</div>
+          <h3 style={{ color: '#1f2937', margin: '0 0 0.5rem' }}>Akses Ditolak</h3>
+          <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+            Anda wajib memberikan izin lokasi untuk dapat mengakses dan melihat katalog produk kami.
+          </p>
+          <button
+            onClick={() => {
+              setLocationDenied(false);
+              setShowEmailPopup(true);
+            }}
+            style={{
+              padding: '0.75rem 2rem', background: '#ef4444', color: 'white',
+              border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer',
+              width: '100%', fontWeight: 'bold'
+            }}
+          >
+            Coba Lagi
+          </button>
         </div>
-      </>
+      </div>
     );
-  }
-
-  if (allProducts.length === 0) {
-    return (
-      <>
-        <Header />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <p>📭 Belum ada produk. Tambahkan data di collection "products".</p>
+  } else if (showEmailPopup) {
+    content = (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.85)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999, padding: '1rem',
+      }}>
+        <div style={{
+          background: 'white', borderRadius: '16px', padding: '2rem',
+          maxWidth: '400px', width: '100%', textAlign: 'center',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
+        }}>
+          <h3 style={{ color: '#1f2937', margin: '0 0 0.5rem' }}>📧 Verifikasi Akses</h3>
+          <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+            Silakan masukkan email Anda untuk melanjutkan ke halaman katalog.
+          </p>
+          <form onSubmit={handleEmailSubmit}>
+            <input
+              type="email"
+              placeholder="contoh@email.com"
+              value={visitorEmail}
+              onChange={(e) => setVisitorEmail(e.target.value)}
+              disabled={isRequestingLocation}
+              required
+              style={{
+                width: '100%', padding: '0.75rem', border: '2px solid #e5e7eb',
+                borderRadius: '8px', fontSize: '1rem', marginBottom: '1.25rem',
+                outline: 'none', boxSizing: 'border-box'
+              }}
+            />
+            <button
+              type="submit"
+              disabled={isRequestingLocation}
+              style={{
+                width: '100%', padding: '0.75rem', 
+                background: isRequestingLocation ? '#9ca3af' : '#3b82f6',
+                color: 'white', border: 'none', borderRadius: '8px',
+                fontSize: '1rem', cursor: isRequestingLocation ? 'not-allowed' : 'pointer', 
+                fontWeight: 'bold'
+              }}
+            >
+              {isRequestingLocation ? '📍 Memverifikasi...' : 'Masuk Katalog'}
+            </button>
+          </form>
         </div>
+      </div>
+    );
+  } else if (loading) {
+    content = <div style={{ padding: '3rem', textAlign: 'center', color: '#4b5563' }}>⏳ Memuat katalog produk...</div>;
+  } else if (error) {
+    content = (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div style={{ background: '#fef2f2', color: '#991b1b', padding: '1.5rem', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
+          <h3>❌ Terjadi Error</h3>
+          <p style={{ color: '#ef4444', fontWeight: '500' }}>{error}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Muat Ulang</button>
+        </div>
+      </div>
+    );
+  } else {
+    content = (
+      <>
+        <div style={{ marginBottom: '1.5rem', maxWidth: '500px', margin: '1.5rem auto' }}>
+          <input
+            type="text"
+            placeholder="🔍 Cari produk, ukuran, atau aroma..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%', padding: '0.75rem 1rem', border: '2px solid #e5e7eb',
+              borderRadius: '8px', fontSize: '1rem', outline: 'none', boxSizing: 'border-box'
+            }}
+          />
+        </div>
+
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '1rem', maxWidth: '800px', margin: '0 auto', padding: '0 1rem 5rem'
+        }}>
+          {filtered.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                background: 'white', borderRadius: '12px',
+                overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              }}
+            >
+              <img
+                src={p.coverUrl}
+                alt={p.name}
+                style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
+              />
+              <div style={{ padding: '0.75rem' }}>
+                <h3 style={{ fontSize: '1rem', margin: '0 0 0.25rem 0', color: '#1f2937' }}>{p.name}</h3>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#e5e7eb', color: '#374151' }}>{p.gender}</span>
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: '#f3f4f6', color: '#374151' }}>{p.size}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedProduct(p);
+                    setShowPreview(true);
+                  }}
+                  style={{
+                    width: '100%', padding: '0.5rem', background: '#3b82f6',
+                    color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer'
+                  }}
+                >
+                  👁️ Preview
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+            <p>🔍 Tidak ada produk yang sesuai.</p>
+          </div>
+        )}
+
+        <button
+          onClick={() => window.open(SHOP_LINK, '_blank')}
+          style={{
+            position: 'fixed', bottom: '1.5rem', right: '1.5rem',
+            background: '#25d366', color: 'white', border: 'none',
+            borderRadius: '50%', width: '56px', height: '56px',
+            fontSize: '1.8rem', cursor: 'pointer', zIndex: 999,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          title="Chat dengan kami"
+        >
+          💬
+        </button>
+
+        {showPreview && selectedProduct && (
+          <div
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.7)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem',
+            }}
+            onClick={() => setShowPreview(false)}
+          >
+            <div
+              style={{
+                background: 'white', borderRadius: '16px', maxWidth: '500px',
+                width: '100%', maxHeight: '90vh', overflow: 'auto', position: 'relative',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowPreview(false)}
+                style={{
+                  position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.1)',
+                  border: 'none', borderRadius: '50%', width: 36, height: 36,
+                  fontSize: '1.2rem', cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+              <img
+                src={selectedProduct.coverUrl}
+                alt={selectedProduct.name}
+                style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }}
+              />
+              <div style={{ padding: '1.5rem' }}>
+                <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0' }}>{selectedProduct.name}</h2>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#e5e7eb' }}>{selectedProduct.gender}</span>
+                  <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.75rem', borderRadius: '4px', background: '#f3f4f6' }}>{selectedProduct.size}</span>
+                </div>
+                <p style={{ fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: '#4b5563' }}>{selectedProduct.desc}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -90,433 +368,22 @@ export default function HomePage() {
   return (
     <>
       <Header />
-      <div style={{ 
-        minHeight: '100vh',
-        background: 'linear-gradient(145deg, #0f0a1a 0%, #1a1028 100%)',
-        padding: '2rem 1rem',
-      }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-
-          {viewMode === 'products' && (
-            <button
-              onClick={goBack}
-              style={{
-                background: 'rgba(255,215,0,0.15)',
-                border: '1px solid #d4af37',
-                color: '#d4af37',
-                padding: '0.5rem 1.2rem',
-                borderRadius: '30px',
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                marginBottom: '1.5rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.3s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,215,0,0.25)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,215,0,0.15)'}
-            >
-              ← Kembali ke Daftar
-            </button>
-          )}
-
-          {viewMode === 'categories' && (
-            <>
-              <h2 style={{
-                textAlign: 'center',
-                color: '#d4af37',
-                fontFamily: '"Playfair Display", serif',
-                fontSize: '2.5rem',
-                fontWeight: '300',
-                letterSpacing: '4px',
-                marginBottom: '0.5rem',
-                textShadow: '0 0 40px rgba(212,175,55,0.1)',
-              }}>
-                Koleksi Parfum
-              </h2>
-              <p style={{
-                textAlign: 'center',
-                color: 'rgba(255,255,255,0.4)',
-                fontSize: '0.9rem',
-                letterSpacing: '2px',
-                marginBottom: '3rem',
-              }}>
-                Pilih ukuran untuk melihat koleksi
-              </p>
-
-              {/* 🔥 2 KOLOM TETAP */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '1.5rem',
-                maxWidth: '600px',
-                margin: '0 auto',
-              }}>
-                {sizeKeys.map((size) => {
-                  const productsInSize = sizeGroups[size];
-                  const cover = productsInSize[0]?.coverUrl || '';
-                  const count = productsInSize.length;
-
-                  return (
-                    <div
-                      key={size}
-                      onClick={() => {
-                        setSelectedSize(size);
-                        setViewMode('products');
-                      }}
-                      style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: '20px',
-                        border: '1px solid rgba(255,215,0,0.1)',
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                        e.currentTarget.style.borderColor = 'rgba(255,215,0,0.4)';
-                        e.currentTarget.style.boxShadow = '0 16px 48px rgba(212,175,55,0.15)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                        e.currentTarget.style.borderColor = 'rgba(255,215,0,0.1)';
-                        e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.4)';
-                      }}
-                    >
-                      {cover ? (
-                        <img
-                          src={cover}
-                          alt={size}
-                          style={{
-                            width: '100%',
-                            aspectRatio: '1/1',
-                            objectFit: 'cover',
-                            display: 'block',
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '100%',
-                          aspectRatio: '1/1',
-                          background: 'linear-gradient(135deg, #2a1f3d, #1a1028)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#d4af37',
-                          fontSize: '3rem',
-                          fontWeight: '100',
-                        }}>
-                          {size.charAt(0)}
-                        </div>
-                      )}
-                      <div style={{
-                        padding: '1.2rem 1rem',
-                        textAlign: 'center',
-                        borderTop: '1px solid rgba(255,215,0,0.05)',
-                      }}>
-                        <h3 style={{
-                          color: '#ffffff',
-                          fontSize: '1.1rem',
-                          fontWeight: '400',
-                          letterSpacing: '1px',
-                          margin: 0,
-                        }}>
-                          {size}
-                        </h3>
-                        <p style={{
-                          color: 'rgba(255,255,255,0.3)',
-                          fontSize: '0.8rem',
-                          margin: '0.3rem 0 0',
-                        }}>
-                          {count} produk
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {viewMode === 'products' && selectedSize && (
-            <>
-              <h2 style={{
-                color: '#d4af37',
-                fontFamily: '"Playfair Display", serif',
-                fontSize: '2rem',
-                fontWeight: '300',
-                letterSpacing: '3px',
-                textAlign: 'center',
-                marginBottom: '2rem',
-              }}>
-                {selectedSize}
-              </h2>
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '1.5rem',
-                maxWidth: '1200px',
-                margin: '0 auto',
-              }}>
-                {filteredProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    onClick={() => openZoom(product)}
-                    style={{
-                      background: 'rgba(255,255,255,0.03)',
-                      backdropFilter: 'blur(8px)',
-                      borderRadius: '16px',
-                      border: '1px solid rgba(255,255,255,0.05)',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.03)';
-                      e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)';
-                      e.currentTarget.style.boxShadow = '0 12px 32px rgba(212,175,55,0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)';
-                    }}
-                  >
-                    <img
-                      src={product.coverUrl}
-                      alt={product.name}
-                      style={{
-                        width: '100%',
-                        aspectRatio: '3/4',
-                        objectFit: 'cover',
-                        display: 'block',
-                      }}
-                    />
-                    <div style={{ padding: '0.8rem 0.8rem 1rem' }}>
-                      <h4 style={{
-                        color: '#ffffff',
-                        fontSize: '0.9rem',
-                        fontWeight: '400',
-                        margin: '0 0 0.2rem',
-                        letterSpacing: '0.5px',
-                      }}>
-                        {product.name}
-                      </h4>
-                      <div style={{
-                        display: 'flex',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap',
-                        marginBottom: '0.3rem',
-                      }}>
-                        <span style={{
-                          fontSize: '0.65rem',
-                          padding: '0.15rem 0.6rem',
-                          borderRadius: '20px',
-                          background: 'rgba(212,175,55,0.15)',
-                          color: '#d4af37',
-                          border: '1px solid rgba(212,175,55,0.1)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '1px',
-                        }}>
-                          {product.gender}
-                        </span>
-                        <span style={{
-                          fontSize: '0.65rem',
-                          padding: '0.15rem 0.6rem',
-                          borderRadius: '20px',
-                          background: 'rgba(255,255,255,0.05)',
-                          color: 'rgba(255,255,255,0.4)',
-                          border: '1px solid rgba(255,255,255,0.05)',
-                        }}>
-                          {product.size}
-                        </span>
-                        {product.kategori && (
-                          <span style={{
-                            fontSize: '0.65rem',
-                            padding: '0.15rem 0.6rem',
-                            borderRadius: '20px',
-                            background: 'rgba(255,255,255,0.03)',
-                            color: 'rgba(255,255,255,0.3)',
-                            border: '1px solid rgba(255,255,255,0.03)',
-                          }}>
-                            {product.kategori}
-                          </span>
-                        )}
-                      </div>
-                      <p style={{
-                        color: 'rgba(255,255,255,0.3)',
-                        fontSize: '0.7rem',
-                        margin: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: '1.4',
-                      }}>
-                        {product.desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {filteredProducts.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '3rem', color: 'rgba(255,255,255,0.3)' }}>
-                  <p>Tidak ada produk untuk ukuran ini.</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {showZoom && selectedProduct && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.85)',
-            backdropFilter: 'blur(20px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '2rem',
-            animation: 'fadeIn 0.3s ease-out',
-          }}
-          onClick={() => setShowZoom(false)}
-        >
-          <div
-            style={{
-              background: 'rgba(20,15,30,0.9)',
-              border: '1px solid rgba(212,175,55,0.2)',
-              borderRadius: '24px',
-              maxWidth: '700px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              position: 'relative',
-              boxShadow: '0 32px 64px rgba(0,0,0,0.8)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowZoom(false)}
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                background: 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '40px',
-                height: '40px',
-                fontSize: '1.2rem',
-                color: '#ffffff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s',
-                zIndex: 10,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-            >
-              ✕
-            </button>
-
-            <img
-              src={selectedProduct.coverUrl}
-              alt={selectedProduct.name}
-              style={{
-                width: '100%',
-                aspectRatio: '3/4',
-                objectFit: 'cover',
-                display: 'block',
-                borderTopLeftRadius: '24px',
-                borderTopRightRadius: '24px',
-              }}
-            />
-
-            <div style={{ padding: '2rem' }}>
-              <h2 style={{
-                color: '#d4af37',
-                fontSize: '1.8rem',
-                fontWeight: '300',
-                fontFamily: '"Playfair Display", serif',
-                margin: '0 0 0.5rem',
-                letterSpacing: '1px',
-              }}>
-                {selectedProduct.name}
-              </h2>
-
-              <div style={{
-                display: 'flex',
-                gap: '0.8rem',
-                flexWrap: 'wrap',
-                marginBottom: '1rem',
-              }}>
-                <span style={{
-                  fontSize: '0.8rem',
-                  padding: '0.2rem 1rem',
-                  borderRadius: '20px',
-                  background: 'rgba(212,175,55,0.15)',
-                  color: '#d4af37',
-                  border: '1px solid rgba(212,175,55,0.1)',
-                }}>
-                  {selectedProduct.gender}
-                </span>
-                <span style={{
-                  fontSize: '0.8rem',
-                  padding: '0.2rem 1rem',
-                  borderRadius: '20px',
-                  background: 'rgba(255,255,255,0.05)',
-                  color: 'rgba(255,255,255,0.6)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                }}>
-                  {selectedProduct.size}
-                </span>
-                {selectedProduct.kategori && (
-                  <span style={{
-                    fontSize: '0.8rem',
-                    padding: '0.2rem 1rem',
-                    borderRadius: '20px',
-                    background: 'rgba(255,255,255,0.03)',
-                    color: 'rgba(255,255,255,0.3)',
-                    border: '1px solid rgba(255,255,255,0.03)',
-                  }}>
-                    {selectedProduct.kategori}
-                  </span>
-                )}
-              </div>
-
-              <p style={{
-                color: 'rgba(255,255,255,0.7)',
-                fontSize: '0.95rem',
-                lineHeight: '1.8',
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-              }}>
-                {selectedProduct.desc}
-              </p>
-            </div>
-          </div>
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)',
+          background: toast.includes('✅') ? '#10b981' : (toast.includes('⚠️') ? '#f59e0b' : '#ef4444'), color: 'white',
+          padding: '0.75rem 1.5rem', borderRadius: '8px', zIndex: 10000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: '90%', textAlign: 'center',
+          animation: 'fadeInDown 0.3s ease-out', fontWeight: '500'
+        }}>
+          {toast}
         </div>
       )}
-
+      {content}
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
     </>
