@@ -5,6 +5,7 @@ export interface Product {
   gender: string;
   size: string;
   desc: string;
+  kategori: string;
 }
 
 export interface BookState {
